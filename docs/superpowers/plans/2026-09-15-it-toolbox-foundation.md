@@ -1,7 +1,7 @@
 ---
 change: it-toolbox-app
 design-doc: docs/superpowers/specs/2026-09-15-it-toolbox-design.md
-base-ref: e95dde6beb2355a62b10d488ddfc76434649a40f
+base-ref: f4497ace919e563ab43433da2a8b7c1bb3b09dc2
 ---
 
 # IT Toolbox 基座与框架 实施计划
