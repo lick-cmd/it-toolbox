@@ -34,6 +34,33 @@ export default tseslint.config(
     },
   },
   {
+    // Node 脚本（.mjs/.cjs 不在 eslintRecommended 的覆盖内，其 no-undef 仍开启）：
+    // 显式声明所需 Node 全局，避免为了过检查而给全仓关掉 no-undef。
+    // 有意不声明 fetch：脚本里出现网络 API 应当报错，而不是被当成可用全局。
+    files: ['scripts/**/*.{js,mjs,cjs}'],
+    languageOptions: {
+      globals: {
+        console: 'readonly',
+        process: 'readonly',
+        URL: 'readonly',
+        URLSearchParams: 'readonly',
+        Buffer: 'readonly',
+        TextEncoder: 'readonly',
+        TextDecoder: 'readonly',
+        __dirname: 'readonly',
+        __filename: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        setImmediate: 'readonly',
+        clearImmediate: 'readonly',
+        queueMicrotask: 'readonly',
+        structuredClone: 'readonly',
+      },
+    },
+  },
+  {
     // core 层：纯函数，零 React / 零 Tauri / 零 DOM
     files: ['src/core/**/*.ts'],
     rules: {
