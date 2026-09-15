@@ -1,4 +1,12 @@
-import { vi } from 'vitest'
+import { cleanup } from '@testing-library/react'
+import { afterEach, vi } from 'vitest'
+
+// RTL 的自动 cleanup 依赖「全局可用的 afterEach」；本项目未开 `globals`（见 vitest.config.ts），
+// 因此必须显式注册 —— 否则同一测试文件内多次 render 的 DOM 会互相泄漏（T13 实测：
+// 第二个用例起报 `Found multiple elements with the role "alert"`）。
+afterEach(() => {
+  cleanup()
+})
 
 // jsdom 不实现 matchMedia，而主题「跟随系统」依赖它
 if (typeof window !== 'undefined' && !window.matchMedia) {
