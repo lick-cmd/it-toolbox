@@ -43,7 +43,22 @@ export default tseslint.config(
           patterns: [
             { group: ['react', 'react-dom', 'react/*'], message: 'core 层不得依赖 React' },
             { group: ['@tauri-apps/*'], message: 'core 层不得依赖 Tauri' },
-            { group: ['@/framework/*', '@/app/*', '@/tools/*'], message: 'core 层不得依赖上层' },
+            // 别名与相对路径都要列：no-restricted-imports 只对原始 import 字符串做匹配，
+            // 漏掉相对路径会给 core→上层 留一条静默逃逸口（框架层同理，故并列两处）。
+            {
+              group: [
+                '@/framework/*',
+                '@/app/*',
+                '@/tools/*',
+                '../framework/*',
+                '../../framework/*',
+                '../app/*',
+                '../../app/*',
+                '../tools/*',
+                '../../tools/*',
+              ],
+              message: 'core 层不得依赖上层',
+            },
           ],
         },
       ],
