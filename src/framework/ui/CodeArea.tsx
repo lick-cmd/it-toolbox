@@ -9,10 +9,7 @@ export interface CodeAreaProps {
   rows?: number
   /** 出错行号（1 基），用于高亮 */
   errorLine?: number
-  /**
-   * 出错字符偏移。保留为对外接口，但**组件内未使用** —— 计划的设计是调用方
-   * 用 `lineOfOffset` 换算成 `errorLine` 后再传入（见 SDD 账本 T13 记录）。
-   */
+  /** 出错字符偏移；未给 `errorLine` 时由组件用 `lineOfOffset` 兜底换算 */
   errorOffset?: number
   className?: string
 }
@@ -25,8 +22,14 @@ export function CodeArea({
   placeholder,
   rows = 10,
   errorLine,
+  errorOffset,
   className,
 }: CodeAreaProps) {
+  // errorLine 优先（调用方已完成换算）；只给 errorOffset 时在此兜底换算 —— 否则该对外参数
+  // 会静默无效。注意：定位只在**只读视图**生效，可编辑 textarea 不显示任何高亮。
+  const effectiveErrorLine =
+    errorLine ?? (errorOffset === undefined ? undefined : lineOfOffset(value, errorOffset))
+
   // 只读视图用带行号的行列表，以便逐行标错
   if (readOnly) {
     const lines = value.split('\n')
@@ -39,7 +42,7 @@ export function CodeArea({
           <ol className="m-0 list-none p-0">
             {lines.map((line, index) => {
               const lineNumber = index + 1
-              const isError = errorLine === lineNumber
+              const isError = effectiveErrorLine === lineNumber
               return (
                 <li
                   key={`${lineNumber}-${line.length}`}

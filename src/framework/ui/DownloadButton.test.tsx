@@ -33,8 +33,13 @@ describe('DownloadButton', () => {
     expect(mockDownload).toHaveBeenCalledWith('a.json', '{}', 'application/json')
   })
 
-  it('写失败时反馈「下载失败」，不再静默（T14 评审 IMPORTANT-1）', async () => {
-    mockDownload.mockResolvedValue({ ok: false, error: '保存文件失败', code: 'WRITE_FAILED' })
+  it('写失败时反馈「下载失败」并把原因放进 title，不再静默（T14 评审 IMPORTANT-1）', async () => {
+    mockDownload.mockResolvedValue({
+      ok: false,
+      error: '保存文件失败',
+      code: 'WRITE_FAILED',
+      detail: 'forbidden path',
+    })
     const user = userEvent.setup()
     render(<DownloadButton filename="a.json" text="{}" />)
 
@@ -43,6 +48,8 @@ describe('DownloadButton', () => {
     await waitFor(() => {
       expect(screen.getByRole('button').textContent).toContain('下载失败')
     })
+    // 原因可见，否则「ACL 拒绝」与「磁盘失败」在界面上无法区分（T13 评审 Minor）
+    expect(screen.getByRole('button').getAttribute('title')).toContain('forbidden path')
   })
 
   it('用户主动取消不算失败，保持原标签', async () => {
