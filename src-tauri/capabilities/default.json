@@ -18,6 +18,14 @@
       ]
     },
     {
+      "identifier": "fs:allow-write-text-file",
+      "allow": [
+        { "path": "$DOWNLOAD/**" },
+        { "path": "$DOCUMENT/**" },
+        { "path": "$DESKTOP/**" }
+      ]
+    },
+    {
       "identifier": "fs:allow-read-file",
       "allow": [
         { "path": "$DOWNLOAD/**" },
