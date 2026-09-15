@@ -17,6 +17,7 @@ describe('isLocalTarget', () => {
     ['Tauri asset 协议', 'asset://localhost/a.png'],
     ['blob 对象 URL', 'blob:http://localhost/uuid'],
     ['data URL', 'data:image/png;base64,AAAA'],
+    ['Tauri 在 Windows 上的 IPC 主机', 'http://ipc.localhost/invoke'],
   ])('%s 视为本地', (_label, target) => {
     expect(isLocalTarget(target)).toBe(true)
   })
@@ -26,6 +27,7 @@ describe('isLocalTarget', () => {
     ['http 外站', 'http://example.com/'],
     ['协议相对外站', '//evil.com/x'],
     ['带端口的 IP 外站', 'http://8.8.8.8:53/'],
+    ['主机名以 .localhost 结尾的外站', 'http://localhost.evil.com/'],
   ])('%s 不视为本地', (_label, target) => {
     expect(isLocalTarget(target)).toBe(false)
   })

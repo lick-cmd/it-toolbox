@@ -15,6 +15,18 @@ const INTERNAL_SCHEME = /^(?:ipc:|asset:|tauri:|blob:|data:)/i
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]', '0.0.0.0'])
 
 /**
+ * `*.localhost` 按 RFC 6761 §6.3 一律解析到回环，浏览器亦强制如此。
+ *
+ * 必须连带放行：Tauri 在 **Windows / Android** 上不是用 `ipc://localhost` 暴露内部
+ * 协议，而是 `http://ipc.localhost`（asset 协议同理为 `http://asset.localhost`）——
+ * 见 `tauri/scripts/ipc-protocol.js` 的 `fetch(convertFileSrc(cmd, 'ipc'))`。
+ * 只认字面 `localhost` 会让守卫在 Windows 的 dev 环境里拦掉应用自己的 IPC。
+ */
+function isLocalHostname(hostname: string): boolean {
+  return LOOPBACK_HOSTS.has(hostname) || hostname.endsWith('.localhost')
+}
+
+/**
  * 判断目标是否为本机地址。
  *
  * 之所以以「目标是否外部」而非「是否调用网络 API」为判定标准：
@@ -30,7 +42,7 @@ export function isLocalTarget(target: string): boolean {
   try {
     // 相对路径会落到占位 base 上，因而 hostname 为 localhost
     const url = new URL(target, 'http://localhost')
-    return LOOPBACK_HOSTS.has(url.hostname)
+    return isLocalHostname(url.hostname)
   } catch {
     return false
   }
