@@ -40,6 +40,14 @@ describe('注册表不变式', () => {
     expect(getTool('does-not-exist')).toBeUndefined()
   })
 
+  // 正向发现证据：R9 曾删除本条，R62② 判定其去处（T19）并不存在，故恢复。
+  // 若 glob 失效导致工具未被发现，上面的循环型断言仍会全绿 —— 只有本条能发现。
+  it('UUID 生成器已被 glob 发现', () => {
+    const entry = getTool('uuid-generator')
+    expect(entry).toBeDefined()
+    expect(entry?.meta.category).toBe('crypto')
+  })
+
   it('listByCategory 只返回该类别且保持顺序稳定', () => {
     const crypto = listByCategory('crypto')
     expect(crypto.every((e) => e.meta.category === 'crypto')).toBe(true)
