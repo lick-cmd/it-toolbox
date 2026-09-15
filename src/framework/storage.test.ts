@@ -96,3 +96,25 @@ describe('工具状态存取', () => {
     expect(PREF_KEY.startsWith('itt:v1:')).toBe(true)
   })
 })
+
+// R66：上面「localStorage 抛错时降级为内存且不崩溃」只在 writeJson 的 try/catch 层面通过 ——
+// 同文件前几条用例已把模块级 driver 缓存为 localStorage 实现，故那条用例里的 setItem 抛错
+// 被静默吞掉，内存降级路径从未执行、isUsingMemoryFallback() 始终为 false。
+// 这里用「新模块实例 + 探测前即抛错」真正跑通降级路径（spec：存储不可用须降级为无持久化模式）。
+describe('存储不可用时的降级', () => {
+  it('探测即失败时切换到内存驱动，读写仍可用且不落盘', async () => {
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('SecurityError')
+    })
+    vi.resetModules()
+    const fresh = await import('./storage')
+
+    expect(fresh.isUsingMemoryFallback()).toBe(true)
+    fresh.writeJson('k', { a: 1 })
+    expect(fresh.readJson('k', null)).toEqual({ a: 1 })
+    expect(window.localStorage.getItem('k')).toBeNull()
+
+    spy.mockRestore()
+    vi.resetModules()
+  })
+})
