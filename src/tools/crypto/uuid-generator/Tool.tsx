@@ -58,23 +58,24 @@ export default function UuidGeneratorTool() {
           detail: `当前值为 ${count}`,
         }
 
-  // 依赖必须是原始值：countError 在非法时每次渲染都是新对象，直接进 deps 会造成
-  //「effect → setCanonical([]) → 重渲染 → 新对象 → effect」死循环
-  // （实测：数量非法时界面卡死，测试进程挂起 15 分钟以上）
-  const countInvalid = countError !== null
+  // R16：依赖必须是原始值 —— countError 在非法时每次渲染都是新对象，直接进 deps 会造成
+  //「effect → setCanonical([]) → 重渲染 → 新对象 → effect」的无限渲染循环
+  // （实测：数量非法时界面卡死，测试进程挂起 15 分 24 秒，日志只有 vitest banner）；
+  // 并用函数式更新守卫，已是空数组时直接 bail out，避免无谓重渲染。
+  const countIsValid = countError === null
 
   useEffect(() => {
-    if (countInvalid) {
-      setCanonical([])
+    if (!countIsValid) {
+      setCanonical((prev) => (prev.length === 0 ? prev : []))
       return
     }
     // 用 try/catch 兜住生成层可能抛出的参数异常
     try {
       setCanonical(generateUuids({ version, count, hyphens: false, uppercase: false }))
     } catch {
-      setCanonical([])
+      setCanonical((prev) => (prev.length === 0 ? prev : []))
     }
-  }, [version, count, countInvalid])
+  }, [version, count, countIsValid])
 
   // 格式变更只影响渲染，不触发重新生成
   const rendered = useMemo(
