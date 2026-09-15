@@ -361,10 +361,15 @@ delta spec 的"离线可用"要求若只写"不产生出网请求"，第 18 个�
 
 | 层 | 手段 | 性质 |
 |---|---|---|
-| **1 结构层** | CSP：`default-src 'self'; connect-src 'none'; img-src 'self' data: blob:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'` | 让外发在浏览器网络层**不可能** —— 即使代码写了 `fetch` 也会被拒 |
+| **1 结构层** | CSP：`default-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost data: blob:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'` | 让外发在浏览器网络层**不可能** —— 即使代码写了 `fetch` 也会被拒 |
 | **2 检测层** | dev 期包装 `fetch`/`XMLHttpRequest`/`WebSocket`，命中即抛错 + 控制台标红 | 开发时立刻暴露 |
 | **3 预防层** | CI 扫描 `dist/` 中的外链字面量与 `fetch(` 调用，命中即构建失败 | 拦住回归 |
 | **4 交互层** | Markdown 远程图片渲染为占位块（不发起加载）；外链点击交由系统浏览器，不在 WebView 内导航 | CSP 之外仍需向用户交代的行为 |
+
+**CSP 的两处易错点**（已在实现计划中固化）：
+
+1. `connect-src` **必须**包含 `ipc:` 与 `http://ipc.localhost`（两个写法都要，覆盖不同平台的自定义协议表现形式）。若写成 `'none'`，Tauri 的 `invoke` 会被拒绝，dialog / fs / clipboard 三个插件全部失效。该配置只放行应用内部通道，不产生任何外部出网能力。
+2. Vite 的 HMR 走 `ws://`，而 `http:` **不覆盖** `ws:`。生产 CSP 必须保持最严，开发期放宽项放在 `devCsp` 中（含 `ws://localhost:1420` 与 `'unsafe-eval'`），**绝不带入生产构建**。
 
 **CSP 的 `img-src` 不含 `https:`** 是缺口封堵的关键 —— 它结构性挡住了最容易被漏掉的声明式外发：
 

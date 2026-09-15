@@ -84,7 +84,7 @@
 
 系统 SHALL 在无网络环境下提供全部工具功能。应用运行期间**零出网请求** SHALL 由以下四层机制共同保证，而非仅靠行为约定：
 
-1. **结构层**：内容安全策略 SHALL 设置 `connect-src 'none'`，且 `img-src`、`font-src`、`style-src`、`script-src` SHALL 不包含任何远程来源
+1. **结构层**：内容安全策略 SHALL 将 `connect-src` 限定为应用自身的内部通道（Tauri IPC），且 `img-src`、`font-src`、`style-src`、`script-src` SHALL 不包含任何远程来源
 2. **检测层**：开发构建 SHALL 包装 `fetch`、`XMLHttpRequest`、`WebSocket`，任一被调用即抛出错误并在控制台显著提示
 3. **预防层**：构建流水线 SHALL 扫描产物中的远程 URL 字面量，发现即令构建失败
 4. **交互层**：见「外部链接与远程资源处理」
