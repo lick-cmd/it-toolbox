@@ -58,8 +58,13 @@ export default function UuidGeneratorTool() {
           detail: `当前值为 ${count}`,
         }
 
+  // 依赖必须是原始值：countError 在非法时每次渲染都是新对象，直接进 deps 会造成
+  //「effect → setCanonical([]) → 重渲染 → 新对象 → effect」死循环
+  // （实测：数量非法时界面卡死，测试进程挂起 15 分钟以上）
+  const countInvalid = countError !== null
+
   useEffect(() => {
-    if (countError) {
+    if (countInvalid) {
       setCanonical([])
       return
     }
@@ -69,7 +74,7 @@ export default function UuidGeneratorTool() {
     } catch {
       setCanonical([])
     }
-  }, [version, count, countError])
+  }, [version, count, countInvalid])
 
   // 格式变更只影响渲染，不触发重新生成
   const rendered = useMemo(
@@ -138,8 +143,8 @@ export default function UuidGeneratorTool() {
         <div className="p-2.5 text-[12px] text-muted">
           {version === 1 ? (
             <p>
-              v1 基于时间戳与节点 ID 生成。本应用的节点 ID 为**会话级随机值**（已按 RFC 4122
-              置 multicast 标志），并非本机网卡地址 —— 运行环境无法获取该信息。
+              v1 基于时间戳与节点 ID 生成。本应用的节点 ID 为<strong className="text-fg">会话级随机值</strong>（已按
+              RFC 4122 置 multicast 标志），并非本机网卡地址 —— 运行环境无法获取该信息。
             </p>
           ) : version === 4 ? (
             <p>v4 完全随机生成，不含时间或位置信息。</p>
