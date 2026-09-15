@@ -12,7 +12,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "scan:egress": "node scripts/scan-egress.mjs",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",
