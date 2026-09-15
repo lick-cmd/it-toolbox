@@ -1,6 +1,6 @@
-import { act, render, screen, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import UuidGeneratorTool from './Tool'
 
 /**
@@ -16,6 +16,11 @@ const V4_LINE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f
 const lines = () =>
   screen.getAllByRole('listitem').map((item) => item.lastElementChild?.textContent ?? '')
 const versionGroup = () => screen.getByRole('group', { name: 'UUID 版本' })
+/** 把 localStorage 里所有值拼起来：键名格式属实现细节，断言不依赖它 */
+const savedValues = () =>
+  Array.from({ length: localStorage.length }, (_, index) =>
+    localStorage.getItem(localStorage.key(index) ?? ''),
+  ).join('')
 const checkbox = (name: string) => screen.getByRole('checkbox', { name }) as HTMLInputElement
 
 /**
@@ -52,6 +57,8 @@ describe('UUID 生成器工具', () => {
     await userEvent.click(checkbox('大写'))
 
     const after = lines()
+    // 先排除「视图根本没更新」：否则若 before 恰好全小写，下面第一条会恒真
+    expect(after).not.toEqual(before)
     expect(after).toEqual(before.map((line) => line.toUpperCase()))
     expect(after.map((line) => line.toLowerCase())).toEqual(before)
     expect(checkbox('大写').checked).toBe(true)
@@ -121,14 +128,25 @@ describe('UUID 生成器工具', () => {
 
   it('选项跨重开保留（useToolState 持久化，写入去抖 200ms）', async () => {
     const first = render(<UuidGeneratorTool />)
-    await userEvent.click(checkbox('大写'))
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 300))
-    })
-    first.unmount()
 
+    await userEvent.click(checkbox('大写'))
+    const countInput = screen.getByRole('spinbutton', { name: '生成数量' })
+    await userEvent.clear(countInput)
+    await userEvent.type(countInput, '3')
+    await pickVersion(2) // v7
+
+    // 轮询到「去抖真的落盘」为止，而不是死等固定时长（死等只剩 100ms 余量，CI 迟发会假红）
+    await vi.waitFor(() => expect(savedValues()).toContain('"uppercase":true'), { timeout: 3000 })
+
+    first.unmount()
     render(<UuidGeneratorTool />)
+
     expect(checkbox('大写').checked).toBe(true)
+    expect((screen.getByRole('spinbutton', { name: '生成数量' }) as HTMLInputElement).value).toBe(
+      '3',
+    )
+    expect(lines()).toHaveLength(3)
+    expect(lines()[0]![14]).toBe('7')
   })
 
   // 计划留下的文案缺陷：JSX 里写 Markdown 星号会被当字面量渲染出来
