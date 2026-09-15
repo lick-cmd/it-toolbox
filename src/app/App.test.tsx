@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ToolEntry } from '@/framework/registry'
 import { __resetPrefsForTests, type RecentEntry } from '@/framework/usePrefs'
@@ -156,5 +157,29 @@ describe('App', () => {
     )
     expect(screen.queryByRole('navigation', { name: '工具导航' })).toBeNull()
     expect(screen.getByRole('button', { name: '打开导航' })).toBeDefined()
+  })
+
+  it('页头搜索按钮打开命令面板，Escape 关闭', async () => {
+    render(<App />)
+    await userEvent.click(screen.getByRole('button', { name: /搜索/ }))
+    expect(screen.getByRole('dialog', { name: '搜索工具' })).toBeDefined()
+
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  // spec 的硬要求：输入框聚焦时全局快捷键仍须生效（计划把这条留成手工验证）
+  it('输入框保持聚焦时 Cmd+K 仍能关闭并重新打开面板', async () => {
+    render(<App />)
+    await userEvent.click(screen.getByRole('button', { name: /搜索/ }))
+
+    const textbox = screen.getByRole('textbox')
+    expect(document.activeElement).toBe(textbox)
+
+    await userEvent.keyboard('{Meta>}k{/Meta}')
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    await userEvent.keyboard('{Meta>}k{/Meta}')
+    expect(screen.getByRole('dialog', { name: '搜索工具' })).toBeDefined()
   })
 })

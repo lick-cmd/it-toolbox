@@ -8,6 +8,12 @@ afterEach(() => {
   cleanup()
 })
 
+// jsdom 不实现 Element.scrollIntoView，而命令面板的「高亮项滚入视野」依赖它
+// （T17 落地前预检实测：`Element.prototype.scrollIntoView` 为 undefined ⇒ 计划代码会抛错）
+if (typeof window !== 'undefined' && !window.Element.prototype.scrollIntoView) {
+  window.Element.prototype.scrollIntoView = vi.fn() as unknown as typeof window.Element.prototype.scrollIntoView
+}
+
 // jsdom 不实现 matchMedia，而主题「跟随系统」依赖它
 if (typeof window !== 'undefined' && !window.matchMedia) {
   window.matchMedia = ((query: string) => ({

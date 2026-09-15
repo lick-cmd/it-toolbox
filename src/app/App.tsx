@@ -4,6 +4,7 @@ import { applyTheme, resolveTheme, systemPrefersDark } from '@/framework/theme'
 import { pushRecent, usePrefs, type RecentEntry } from '@/framework/usePrefs'
 import { ToolHost } from '@/framework/ToolHost'
 import { Icon } from '@/framework/ui/Icon'
+import { CommandPalette } from './CommandPalette'
 import { Sidebar } from './Sidebar'
 import { ThemeToggle } from './ThemeToggle'
 
@@ -30,6 +31,7 @@ export function App() {
   const prefs = usePrefs()
   const [activeId, setActiveId] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [paletteOpen, setPaletteOpen] = useState(false)
   const [isNarrow, setIsNarrow] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia(NARROW_QUERY).matches : false,
   )
@@ -57,6 +59,21 @@ export function App() {
     query.addEventListener('change', apply)
     return () => query.removeEventListener('change', apply)
   }, [prefs.theme])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      // 输入框聚焦时仍需生效，因此监听 window 而非某个容器
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setPaletteOpen((open) => !open)
+        return
+      }
+      if (event.key === 'Escape') setPaletteOpen(false)
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   const openTool = useCallback((id: string) => {
     setActiveId(id)
@@ -108,6 +125,16 @@ export function App() {
             )}
           </div>
 
+          <button
+            type="button"
+            onClick={() => setPaletteOpen(true)}
+            className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-sm border border-border px-2 text-[11px] text-muted hover:text-fg"
+          >
+            <Icon name="search" size={13} />
+            <span>搜索</span>
+            <kbd className="text-[10px]">⌘K</kbd>
+          </button>
+
           <ThemeToggle />
         </header>
 
@@ -115,6 +142,12 @@ export function App() {
           {resolvedEntry ? <ToolHost entry={resolvedEntry} /> : <p className="p-4 text-muted">尚无可用工具</p>}
         </main>
       </div>
+
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        onSelect={openTool}
+      />
     </div>
   )
 }
