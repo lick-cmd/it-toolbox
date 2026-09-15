@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { categoryById } from '@/framework/categories'
 import { searchTools } from '@/framework/search'
 import { Icon } from '@/framework/ui/Icon'
@@ -19,8 +19,10 @@ export function CommandPalette({ open, onClose, onSelect }: CommandPaletteProps)
 
   const hits = useMemo(() => searchTools(query).slice(0, MAX_RESULTS), [query])
 
-  // 每次打开重置查询与高亮项
-  useEffect(() => {
+  // 每次打开重置查询与高亮项。
+  // 必须用 useLayoutEffect：面板由 App 常驻渲染，关闭时内部 state 仍保留上次查询，
+  // 若在 paint 之后（useEffect）才重置，重开会先闪一帧旧查询与旧结果。
+  useLayoutEffect(() => {
     if (!open) return
     setQuery('')
     setActiveIndex(0)

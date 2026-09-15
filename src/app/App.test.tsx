@@ -182,4 +182,13 @@ describe('App', () => {
     await userEvent.keyboard('{Meta>}k{/Meta}')
     expect(screen.getByRole('dialog', { name: '搜索工具' })).toBeDefined()
   })
+
+  // 补这一条是为了不依赖 CommandPalette.test 里的合成样本：走真实注册表 + 真实 meta.ts 关键词
+  it('真实注册表下按中文关键词命中工具', async () => {
+    render(<App />)
+    await userEvent.click(screen.getByRole('button', { name: /搜索/ }))
+    await userEvent.type(screen.getByRole('textbox'), '唯一标识')
+
+    expect(within(screen.getByRole('dialog', { name: '搜索工具' })).getByText('UUID 生成器')).toBeDefined()
+  })
 })
