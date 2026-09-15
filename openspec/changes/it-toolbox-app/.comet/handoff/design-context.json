@@ -1,0 +1,20 @@
+{
+  "change": "it-toolbox-app",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "1f792b3d2263546029ea1d91d657a98f2c0f78fdf9c6f9abdceb3124bf557ff6",
+  "files": [
+    { "path": "openspec/changes/it-toolbox-app/proposal.md", "sha256": "20e845fb37a0afbdcefeb919fae30befa246fe46b0bf24e0a389ae6bb16b07b5" },
+    { "path": "openspec/changes/it-toolbox-app/design.md", "sha256": "389182332085f7b29205e74743cbff516830eb00837896a3e7eec3eb61ffaee1" },
+    { "path": "openspec/changes/it-toolbox-app/tasks.md", "sha256": "140edd2274e25d39020fd01619ee8513f20ea7d027f19ec35918b0c06b88af48" },
+    { "path": "openspec/changes/it-toolbox-app/specs/app-shell/spec.md", "sha256": "2b6ceaf3fd8da325fc65bbcf842bd0c5d77a0a3f0a403fabd6783c16b340daf5" },
+    { "path": "openspec/changes/it-toolbox-app/specs/converter-tools/spec.md", "sha256": "bf462f2472a2b73209ec0aff66257e8c4939d39c70c0e0fdb932010c656a4b7d" },
+    { "path": "openspec/changes/it-toolbox-app/specs/crypto-tools/spec.md", "sha256": "8c67cb5bb222b6baba25e55b494fae148a44b04e20dab9ed24535496dccc8792" },
+    { "path": "openspec/changes/it-toolbox-app/specs/dev-tools/spec.md", "sha256": "043c60e01e10302877f353bfab616eba9c57c89073cb7cc3e73e34d1a4ab087b" },
+    { "path": "openspec/changes/it-toolbox-app/specs/image-tools/spec.md", "sha256": "98c372ce52a809e0711d591ea48938af6dfedd048500dede76bd814518bccb9b" },
+    { "path": "openspec/changes/it-toolbox-app/specs/tool-registry/spec.md", "sha256": "e3150db71bede039f56243f4b2d4de04ce3ab982105aae49005b96433d90a015" },
+    { "path": "openspec/changes/it-toolbox-app/specs/web-tools/spec.md", "sha256": "d4fdc1fddd45ef2c9e9276baa34cab748b603d2c17d52b517245e306b47d887d" }
+  ]
+}
