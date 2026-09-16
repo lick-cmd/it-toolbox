@@ -39,15 +39,15 @@
 npm install
 npm run tauri:dev     # 桌面应用
 npm run dev           # 仅浏览器预览（UI 开发用，Tauri 能力自动降级）
-npm run test          # 全部单测（core 与 ui 两个 project）
+npm run test          # 全部单测（core / ui / scripts 三个 project）
 npm run typecheck     # 类型检查
 npm run lint          # ESLint（含依赖方向规则）
 npm run build         # 类型检查 + 前端构建 + 外发扫描
 npm run tauri:build   # 打包桌面安装产物
 ```
 
-单测分两个 project：`core`（Node 环境，纯算法，零 React / 零 Tauri / 零 DOM）与
-`ui`（jsdom，框架层、工具组件与应用外壳）。
+单测分三个 project：`core`（Node 环境，纯算法，零 React / 零 Tauri / 零 DOM）、
+`ui`（jsdom，框架层、工具组件与应用外壳）与 `scripts`（Node 环境，构建期脚本，如产物外发扫描）。
 
 ## 离线约束
 

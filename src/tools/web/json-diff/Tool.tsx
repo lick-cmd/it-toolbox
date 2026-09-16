@@ -69,7 +69,7 @@ function DiffRow({ entry }: { entry: DiffEntry }) {
 }
 
 export default function JsonDiffTool() {
-  const { state, update, updateOptions } = useToolState('json-diff', INITIAL_STATE)
+  const { state, update, updateOptions, reset } = useToolState('json-diff', INITIAL_STATE)
   const { input } = state
   const right = state.options.right
 
@@ -121,10 +121,9 @@ export default function JsonDiffTool() {
           <button
             type="button"
             className={BUTTON}
-            onClick={() => {
-              update({ input: '' })
-              updateOptions({ right: '' })
-            }}
+            // 用框架层的 reset，而不是自己拼两次 setState：它同时抹掉该工具已落盘的快照，
+            // 「清空」于是对持久化也成立（否则旧内容还躺在 localStorage 里）
+            onClick={() => reset()}
           >
             清空
           </button>

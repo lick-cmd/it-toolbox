@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
+import { TOOL_STATE_KEY } from '@/framework/storage'
 import JsonDiffTool from './Tool'
 
 /**
@@ -139,5 +140,42 @@ describe('JSON 差异比较工具', () => {
   it('两侧都为空时展示空态', () => {
     render(<JsonDiffTool />)
     expect(screen.getByText('尚未输入')).toBeDefined()
+  })
+
+  it('挂载时恢复上次输入（按工具 id 从 storage 回读）', () => {
+    // 直接铺一份上次会话的快照：这条同时钉住「恢复各工具上次输入」这一 spec 要求
+    localStorage.setItem(
+      TOOL_STATE_KEY,
+      JSON.stringify({
+        'json-diff': { input: '{"z":9}', options: { right: '{"z":8}' }, updatedAt: 1 },
+      }),
+    )
+
+    render(<JsonDiffTool />)
+
+    expect((screen.getByRole('textbox', { name: '左侧 JSON' }) as HTMLTextAreaElement).value).toBe(
+      '{"z":9}',
+    )
+    expect((screen.getByRole('textbox', { name: '右侧 JSON' }) as HTMLTextAreaElement).value).toBe(
+      '{"z":8}',
+    )
+  })
+
+  it('清空：两侧归零，并立即抹掉已落盘的旧快照', () => {
+    localStorage.setItem(
+      TOOL_STATE_KEY,
+      JSON.stringify({
+        'json-diff': { input: '{"z":9}', options: { right: '{"z":8}' }, updatedAt: 1 },
+      }),
+    )
+    render(<JsonDiffTool />)
+
+    // 用 fireEvent（同步）而非 userEvent：断言必须落在 200ms 写入去抖窗口内，
+    // 否则去抖会把「空态」重新落盘，快照里的 json-diff 键又会回来。
+    fireEvent.click(screen.getByRole('button', { name: '清空' }))
+
+    expect((screen.getByRole('textbox', { name: '左侧 JSON' }) as HTMLTextAreaElement).value).toBe('')
+    expect((screen.getByRole('textbox', { name: '右侧 JSON' }) as HTMLTextAreaElement).value).toBe('')
+    expect(localStorage.getItem(TOOL_STATE_KEY) ?? '').not.toContain('json-diff')
   })
 })

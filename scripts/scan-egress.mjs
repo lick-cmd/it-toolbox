@@ -10,11 +10,17 @@
  * 故使用负向后顾断言排除 `.` 与标识符字符。
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs'
-import { extname, join, relative } from 'node:path'
+import { extname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
-const DIST = join(ROOT, 'dist')
+
+// 扫描目录可被环境变量覆盖：脚本级用例（`scripts/scan-egress.test.mjs`）需要构造
+// 「有外发能力」的人造产物来反向验证本脚本确实会失败 —— 真实 dist/ 必须是干净的，
+// 否则 `npm run build` 早就红了，判定逻辑也就永远没人验证过。
+const DIST = process.env.SCAN_EGRESS_DIST
+  ? resolve(process.env.SCAN_EGRESS_DIST)
+  : join(ROOT, 'dist')
 
 const NETWORK_API =
   /(?<![\w$.])(?:fetch\s*\(|new\s+XMLHttpRequest|new\s+WebSocket|new\s+EventSource|navigator\.sendBeacon)/g

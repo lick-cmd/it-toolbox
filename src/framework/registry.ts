@@ -51,12 +51,27 @@ function basenameOf(directory: string): string {
   return parts[parts.length - 1] ?? ''
 }
 
-function build(): { entries: ToolEntry[]; issues: RegistryIssue[] } {
+export interface RegistryModules {
+  metaModules: Record<string, { default: ToolMeta }>
+  toolModules: Record<string, () => Promise<{ default: ToolComponent }>>
+}
+
+/**
+ * 纯函数形态的注册表构建：模块表由参数注入。
+ *
+ * 生产路径用 `import.meta.glob` 的结果（见下方 `built`）；用例注入合成模块表，
+ * 才能触发「孤儿 meta / 孤儿 Tool / id 重复 / 缺字段」这些在任何真实目录结构下
+ * 都无法出现的失败路径 —— 否则校验代码只有正向路径被覆盖。
+ */
+export function buildRegistry({
+  metaModules: metas,
+  toolModules: tools,
+}: RegistryModules): { entries: ToolEntry[]; issues: RegistryIssue[] } {
   const issues: RegistryIssue[] = []
   const metaByDirectory = new Map<string, { path: string; meta: ToolMeta }>()
   const nameCount = new Map<string, number>()
 
-  for (const [path, module] of Object.entries(metaModules)) {
+  for (const [path, module] of Object.entries(metas)) {
     const directory = directoryOf(path)
     if (metaByDirectory.has(directory)) {
       issues.push({
@@ -70,7 +85,7 @@ function build(): { entries: ToolEntry[]; issues: RegistryIssue[] } {
   }
 
   const toolByDirectory = new Map<string, () => Promise<{ default: ToolComponent }>>()
-  for (const [path, loader] of Object.entries(toolModules)) {
+  for (const [path, loader] of Object.entries(tools)) {
     toolByDirectory.set(directoryOf(path), loader)
   }
 
@@ -82,6 +97,9 @@ function build(): { entries: ToolEntry[]; issues: RegistryIssue[] } {
 
     if (typeof meta !== 'object' || meta === null) {
       issues.push({ kind: 'incomplete-meta', path, detail: 'meta 默认导出不是对象' })
+      // 该目录有 meta.ts（只是导出的不是对象）：它的 Tool.tsx 并非无主，
+      // 故同样要从「孤儿 Tool」候选里摘掉（详见下方同名注释）
+      toolByDirectory.delete(directory)
       continue
     }
 
@@ -143,10 +161,14 @@ function build(): { entries: ToolEntry[]; issues: RegistryIssue[] } {
       invalid = true
     }
 
+    // 走到这里说明该目录的 meta.ts 确实存在（只是可能非法）：它的 Tool.tsx 已有归属，
+    // 一律从「孤儿 Tool」候选里摘掉。原先只在成功分支里 delete，导致**每个非法 meta**
+    // 都会额外多报一条自相矛盾的「有 Tool.tsx 但缺少 meta.ts」—— 该路径此前没有用例
+    // 触发（真实目录结构下不可能有非法 meta），故长期无人发现。
+    toolByDirectory.delete(directory)
     if (invalid || !loader) continue
 
     entries.push({ meta, load: loader })
-    toolByDirectory.delete(directory)
   }
 
   for (const directory of toolByDirectory.keys()) {
@@ -168,7 +190,7 @@ function build(): { entries: ToolEntry[]; issues: RegistryIssue[] } {
   return { entries, issues }
 }
 
-const built = build()
+const built = buildRegistry({ metaModules, toolModules })
 
 /** 开发构建下即时暴露注册问题，避免违规静默进入后续环节。 */
 if (import.meta.env.DEV && built.issues.length > 0) {

@@ -63,4 +63,37 @@ describe('installOfflineGuard', () => {
     expect(violations.some((v) => v.kind === 'fetch' && v.target.includes('example.com'))).toBe(true)
     expect(violations.some((v) => v.kind === 'WebSocket')).toBe(true)
   })
+
+  // XHR 是 fetch 之外最常见的出网通道，此前只被 isLocalTarget 的纯函数用例间接覆盖
+  it('拦截外部 XMLHttpRequest 并记录违规', () => {
+    __resetEgressViolationsForTests()
+    const xhr = new XMLHttpRequest()
+
+    expect(() => xhr.open('GET', 'https://example.com/exfil')).toThrowError(/已拦截外发请求/)
+
+    const violations = getEgressViolations()
+    expect(violations).toHaveLength(1)
+    expect(violations[0]?.kind).toBe('XMLHttpRequest')
+    expect(violations[0]?.target).toBe('https://example.com/exfil')
+  })
+
+  it('放行本机 XMLHttpRequest（否则开发期自身的 IPC 会被拦掉）', () => {
+    const xhr = new XMLHttpRequest()
+
+    expect(() => xhr.open('GET', 'http://localhost:1420/api')).not.toThrow()
+  })
+
+  // 拦下来却只在控制台里「悄悄」抛错，用户与开发者都无从下手 —— 提示本身是能力的一部分
+  it('拦截时除抛错外还给出控制台提示', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      expect(() => fetch('https://example.com/telemetry-2')).toThrowError()
+
+      const call = spy.mock.calls.at(-1)
+      expect(String(call?.[0])).toContain('[offline-guard] 检测到外发请求')
+      expect(call).toContain('https://example.com/telemetry-2')
+    } finally {
+      spy.mockRestore()
+    }
+  })
 })
