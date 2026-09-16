@@ -1,8 +1,10 @@
 import { useMemo } from 'react'
 import {
+  DATE_SHORTCUTS,
   parseDateInput,
   TIMESTAMP_UNITS,
   toDateFields,
+  toLocalInput,
   type TimestampUnit,
 } from '@/core/converter/date'
 import { ToolLayout } from '@/framework/ToolLayout'
@@ -50,6 +52,21 @@ export default function DateConverterTool() {
               onChange={(next) => updateOptions({ unit: next })}
             />
           </Field>
+          <span className="flex flex-wrap items-center gap-1">
+            <span className="shrink-0 text-muted">常用时间</span>
+            {DATE_SHORTCUTS.map((shortcut) => (
+              <button
+                key={shortcut.id}
+                type="button"
+                className={BUTTON}
+                title={shortcut.hint}
+                // 回填本地日期字面量而非时间戳：与「时间戳单位」选项无关，任何设置下都解析正确
+                onClick={() => update({ input: toLocalInput(shortcut.at(Date.now())) })}
+              >
+                {shortcut.label}
+              </button>
+            ))}
+          </span>
           <button
             type="button"
             className={BUTTON}

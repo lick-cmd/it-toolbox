@@ -304,3 +304,53 @@ export function toDateFields(epochMs: number, now: number = Date.now()): DateFie
     { id: 'relative', label: '相对时间', value: relativeTime(epochMs, now) },
   ]
 }
+
+/** 把毫秒时间戳格式化为可回填输入框的本地日期时间（`YYYY-MM-DDTHH:mm:ss`） */
+export function toLocalInput(epochMs: number): string {
+  const date = new Date(epochMs)
+  return (
+    `${pad(date.getFullYear(), 4)}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+  )
+}
+
+export interface DateShortcut {
+  id: string
+  label: string
+  /** 语义说明，作为按钮的 title */
+  hint: string
+  /** 按给定时刻算出对应的**本地**毫秒时间戳 */
+  at: (now: number) => number
+}
+
+/**
+ * 常用时间快捷入口。
+ *
+ * 全部按本地时区取整点边界，且用 `new Date(y, m, d + delta)` 这类本地字段构造，
+ * 而不是加减固定毫秒数 —— 后者跨夏令时切换会整体偏一小时。溢出（如 1 月减一个月）
+ * 由 `Date` 自行归一化，无需手工借位。
+ */
+export const DATE_SHORTCUTS: readonly DateShortcut[] = [
+  { id: 'now', label: '当前时间', hint: '此刻', at: (now) => now },
+  { id: 'today', label: '今天', hint: '今天 00:00:00', at: (now) => startOfLocalDay(now) },
+  { id: 'yesterday', label: '昨天', hint: '昨天 00:00:00', at: (now) => startOfLocalDay(now, -1) },
+  { id: 'this-month', label: '本月', hint: '本月 1 日 00:00:00', at: (now) => startOfLocalMonth(now, 0) },
+  { id: 'last-month', label: '上个月', hint: '上月 1 日 00:00:00', at: (now) => startOfLocalMonth(now, -1) },
+  { id: 'this-year', label: '今年', hint: '本年 1 月 1 日 00:00:00', at: (now) => startOfLocalYear(now, 0) },
+  { id: 'last-year', label: '上一年', hint: '上年 1 月 1 日 00:00:00', at: (now) => startOfLocalYear(now, -1) },
+]
+
+function startOfLocalDay(now: number, dayOffset = 0): number {
+  const date = new Date(now)
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + dayOffset).getTime()
+}
+
+function startOfLocalMonth(now: number, monthOffset: number): number {
+  const date = new Date(now)
+  return new Date(date.getFullYear(), date.getMonth() + monthOffset, 1).getTime()
+}
+
+function startOfLocalYear(now: number, yearOffset: number): number {
+  const date = new Date(now)
+  return new Date(date.getFullYear() + yearOffset, 0, 1).getTime()
+}

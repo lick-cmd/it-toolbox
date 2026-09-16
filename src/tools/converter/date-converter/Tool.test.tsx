@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import DateConverterTool from './Tool'
 
 const input = () => screen.getByRole('textbox', { name: '日期或时间戳' })
@@ -78,5 +78,47 @@ describe('日期转换器工具', () => {
   it('空输入时展示空态', () => {
     render(<DateConverterTool />)
     expect(screen.getByText('尚未输入')).toBeDefined()
+  })
+})
+
+describe('日期转换器 —— 常用时间快捷', () => {
+  // 只伪造 Date，不动 setTimeout：React 调度与工具状态去抖仍用真实计时器
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2024, 2, 15, 10, 30, 0))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('提供当前 / 今天 / 昨天 / 本月 / 上个月 / 今年 / 上一年七个入口', () => {
+    render(<DateConverterTool />)
+    for (const label of ['当前时间', '今天', '昨天', '本月', '上个月', '今年', '上一年']) {
+      expect(screen.getByRole('button', { name: label })).toBeDefined()
+    }
+  })
+
+  it('点击「今天」回填本地零点并给出对应时间戳', () => {
+    render(<DateConverterTool />)
+    fireEvent.click(screen.getByRole('button', { name: '今天' }))
+
+    expect((input() as HTMLTextAreaElement).value).toBe('2024-03-15T00:00:00')
+    const todayStart = new Date(2024, 2, 15).getTime()
+    expect(
+      screen.getByText(String(Math.floor(todayStart / 1000)), { selector: 'code' }),
+    ).toBeDefined()
+  })
+
+  it('点击「上个月」回填上月 1 日零点', () => {
+    render(<DateConverterTool />)
+    fireEvent.click(screen.getByRole('button', { name: '上个月' }))
+    expect((input() as HTMLTextAreaElement).value).toBe('2024-02-01T00:00:00')
+  })
+
+  it('点击「上一年」回填去年 1 月 1 日零点', () => {
+    render(<DateConverterTool />)
+    fireEvent.click(screen.getByRole('button', { name: '上一年' }))
+    expect((input() as HTMLTextAreaElement).value).toBe('2023-01-01T00:00:00')
   })
 })

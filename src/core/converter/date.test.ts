@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { parseDateInput, relativeTime, TIMESTAMP_UNITS, toDateFields } from './date'
+import {
+  DATE_SHORTCUTS,
+  parseDateInput,
+  relativeTime,
+  TIMESTAMP_UNITS,
+  toDateFields,
+  toLocalInput,
+} from './date'
 
 /** 断言解析成功并取出值；失败时把错误原样抛出，便于定位 */
 function mustParse(text: string, unit?: Parameters<typeof parseDateInput>[1]) {
@@ -185,5 +192,60 @@ describe('TIMESTAMP_UNITS', () => {
       'microseconds',
       'nanoseconds',
     ])
+  })
+})
+
+describe('toLocalInput', () => {
+  it('输出本地日期时间，且能被 parseDateInput 原样解析回同一时刻', () => {
+    const epochMs = new Date(2024, 2, 15, 8, 30, 5).getTime()
+    const text = toLocalInput(epochMs)
+    expect(text).toBe('2024-03-15T08:30:05')
+    expect(mustParse(text).epochMs).toBe(epochMs)
+  })
+})
+
+describe('DATE_SHORTCUTS —— 常用时间', () => {
+  const at = (id: string, now: number): number => {
+    const shortcut = DATE_SHORTCUTS.find((item) => item.id === id)
+    if (shortcut === undefined) throw new Error(`缺少快捷项 ${id}`)
+    return shortcut.at(now)
+  }
+
+  it('覆盖需求列出的七项常用时间', () => {
+    expect(DATE_SHORTCUTS.map((item) => item.id)).toEqual([
+      'now',
+      'today',
+      'yesterday',
+      'this-month',
+      'last-month',
+      'this-year',
+      'last-year',
+    ])
+  })
+
+  it('当前时间即给定时刻', () => {
+    const now = new Date(2024, 2, 15, 10, 30, 0).getTime()
+    expect(at('now', now)).toBe(now)
+  })
+
+  it('今天 / 昨天取本地零点', () => {
+    const now = new Date(2024, 2, 15, 10, 30, 0).getTime()
+    expect(at('today', now)).toBe(new Date(2024, 2, 15).getTime())
+    expect(at('yesterday', now)).toBe(new Date(2024, 2, 14).getTime())
+  })
+
+  it('本月 / 上个月取本地 1 日零点，跨年时正确借位', () => {
+    const march = new Date(2024, 2, 15, 10, 0, 0).getTime()
+    expect(at('this-month', march)).toBe(new Date(2024, 2, 1).getTime())
+    expect(at('last-month', march)).toBe(new Date(2024, 1, 1).getTime())
+
+    const january = new Date(2024, 0, 15).getTime()
+    expect(at('last-month', january)).toBe(new Date(2023, 11, 1).getTime())
+  })
+
+  it('今年 / 上一年取本地 1 月 1 日零点', () => {
+    const now = new Date(2024, 5, 20).getTime()
+    expect(at('this-year', now)).toBe(new Date(2024, 0, 1).getTime())
+    expect(at('last-year', now)).toBe(new Date(2023, 0, 1).getTime())
   })
 })
