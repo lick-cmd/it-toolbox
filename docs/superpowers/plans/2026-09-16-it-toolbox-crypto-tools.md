@@ -1095,6 +1095,10 @@ git commit -m "feat(crypto): 实现 HMAC 计算 Core（5.4）
 
 - [ ] **Step 1: 写失败测试**
 
+> **执行期预检修正（2026-09-16）**：下面两处是**计划自身的缺陷**，落地前用外部工具取证后修正：
+> 1. 测试里 `derInteger(fromHex('00000102'))` 期望 `02030102` —— 与计划自己的实现矛盾：`derInteger` 剥离**全部**前导零（X.690 §8.3.2 的要求），值 258 的规范编码是 `02020102`。openssl 实测：`02 02 01 02` → `INTEGER :0102`（合法）、`02 03 00 01 02` → **`BAD INTEGER:[000102]`**（非规范编码），且 `openssl asn1parse -genstr "INTEGER:0x0102"` 输出的就是 `02020102`。已按 `02020102` 落地（`02030102` 会写出 openssl 拒绝的 DER）。
+> 2. 测试里的 `derInteger(new Uint8Array(0))` 期望 `020100`，而计划的实现会给出 `0200`。**测试是对的**：DER 要求 INTEGER 至少有一个内容字节 —— openssl 实测 `02 00` → `BAD INTEGER:[]`、`02 01 00` → `INTEGER :00` ⇒ 实现补上「空输入按零值编码」分支。
+
 创建 `src/core/der.test.ts`：
 
 ```ts
