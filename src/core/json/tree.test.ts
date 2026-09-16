@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildJsonTree, keyText, valueText, type JsonTreeNode } from './tree'
+import { jsonChildPath } from './type-hints'
 
 /** 用例里反复要「按 path 找节点」，单独抽出来避免每处都写一遍递归 */
 function nodeAt(root: JsonTreeNode, path: string): JsonTreeNode | null {
@@ -82,11 +83,12 @@ describe('buildJsonTree', () => {
   })
 
   it('深度超限时，被跳过的子树不会让祖先原文串位', () => {
-    // 上限那一层的内容分别是空容器与标量：都不以开括号开头，
-    // 正是「跳过子树时按括号配对」最容易数错、把游标吃到流末尾的情形。
+    // 上限那一层的内容分别是空容器、标量与「含内层容器 + 尾随标量」：
+    // 都不以单个开括号一路配平，正是「跳过子树时按括号配对」最容易数错的情形。
     for (const source of [
       '['.repeat(257) + '{}' + ']'.repeat(257),
       '['.repeat(257) + '1' + ']'.repeat(257),
+      '['.repeat(257) + '[1],2' + ']'.repeat(257),
     ]) {
       const built = buildJsonTree(source)
       expect(built.ok).toBe(true)
@@ -101,6 +103,28 @@ describe('buildJsonTree', () => {
       // nodeAt 的签名是 JsonTreeNode | null，取不到时返回 null（不是 undefined）
       expect(nodeAt(built.value.root, `${capped}[0]`)).toBeNull()
     }
+  })
+
+  it('键序跟源码走，不跟 Object.keys 的整数键重排', () => {
+    const built = buildJsonTree('{"1":"x","0":"y"}')
+    expect(built.ok).toBe(true)
+    if (!built.ok) return
+
+    expect(built.value.root.raw).toBe('{"1":"x","0":"y"}')
+    // 子节点顺序 = 源码顺序
+    expect(built.value.root.children.map((child) => child.key)).toEqual(['1', '0'])
+    // 每个键配到的原文是它自己那一对
+    expect(nodeAt(built.value.root, jsonChildPath('$', '1'))?.raw).toBe('"x"')
+    expect(nodeAt(built.value.root, jsonChildPath('$', '0'))?.raw).toBe('"y"')
+  })
+
+  it('重复键不吞掉后面的 token', () => {
+    const built = buildJsonTree('{"a":1,"a":2}')
+    expect(built.ok).toBe(true)
+    if (!built.ok) return
+
+    expect(built.value.root.raw).toBe('{"a":1,"a":2}')
+    expect(built.value.root.childCount).toBe(2)
   })
 })
 

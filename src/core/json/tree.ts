@@ -87,8 +87,9 @@ export function buildJsonTree(text: string): Result<JsonTreeModel> {
   let cursor = 0
   let nodeCount = 0
 
-  // 文本已通过 RFC 8259 校验，token 形状与值结构必然对齐；越界读取兜成空串，
-  // 只为不让界面吃到异常（值驱动与 token 驱动一旦错位，宁可少上一点色）。
+  // 结构取值、文本取 token。两者并非天然对齐：**键序必须由 token 流决定** ——
+  // `Object.keys` 会把 "1" 这类整数样键排到前面，且重复键只保留最后一个，
+  // 照它迭代会让 raw 与键整体错位。越界读取兜成空串，只为不让界面吃到异常。
   const rawAt = (index: number): string => tokens[index]?.raw ?? ''
 
   const skipIf = (raw: string): void => {
@@ -96,15 +97,20 @@ export function buildJsonTree(text: string): Result<JsonTreeModel> {
   }
 
   /**
-   * 只在达到深度上限时使用：把整棵子树的 token 消费掉，**停在匹配的闭合符之前**
+   * 只在达到深度上限时使用：把整棵子树的 token 消费掉，**停在本节点自己的闭合符之前**
    * —— 调用方随后那一次 `cursor++` 负责收尾。若在此处吞掉闭合符，父层分隔符
    * 判断会错位，后面所有节点的 raw 都会串位。
+   *
+   * 进入时游标在本节点的**内容起点**（开括号已被消费），所以 depth 从 0 起算：
+   * 内容里的元素若自带容器，其闭合符会把 depth 拉回 0，**回到 0 不再停手** ——
+   * 只有「深度为 0 时遇到的闭合符」才是本节点自己的收尾点。内容以非开括号开头
+   * （空容器、标量）是常态，故这条判断必须放在消费 token 之前。
    */
   const skipSubtree = (): void => {
     let depth = 0
     while (cursor < tokens.length) {
       const raw = rawAt(cursor)
-      // 深度为 0 时遇到的闭合符就是本节点自己那一个：先停手，收尾交给调用方的 cursor++
+      // 只有「本节点自己的闭合符」会以 depth === 0 出现：停在它之前，收尾交给调用方
       if ((raw === '}' || raw === ']') && depth === 0) return
       cursor++
       if (raw === '{' || raw === '[') depth++
@@ -127,17 +133,24 @@ export function buildJsonTree(text: string): Result<JsonTreeModel> {
 
     if (type === 'object') {
       const record = value as Record<string, unknown>
-      const keys = Object.keys(record)
-      childCount = keys.length
       cursor++ // '{'
       if (depth < TREE_MAX_DEPTH) {
-        for (const childKey of keys) {
+        // 键序由 token 流决定，**不能**用 Object.keys 迭代：它会把 "1" 这类整数样键
+        // 排到前面，且重复键只保留最后一个 —— 照它迭代会让 path 与 raw 整体错位。
+        // 值仍按键从解析结果取（`JSON.parse` 的语义：重复键取最后一个）。
+        while (cursor < tokens.length && rawAt(cursor) !== '}') {
+          const keyRaw = rawAt(cursor)
+          const childKey = JSON.parse(keyRaw) as string
           cursor++ // 键字符串
           cursor++ // ':'
           children.push(walk(record[childKey], childKey, jsonChildPath(path, childKey), depth + 1))
+          childCount++
           skipIf(',')
         }
       } else {
+        // 上限层不下钻，只能在值对象上取键数（与数组分支的 items.length 同口径）；
+        // 无重复键时它等于源码里的键对数。
+        childCount = Object.keys(record).length
         skipSubtree()
       }
       cursor++ // '}'
