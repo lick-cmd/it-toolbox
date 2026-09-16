@@ -841,7 +841,23 @@ describe('JsonCode', () => {
     const { container } = render(<JsonCode value={value} />)
     expect(linesOf(container)).toHaveLength(3)
     expect(linesOf(container).join('\n')).toBe(value)
-    expect(container.textContent).toContain('2')
+    // 行号列是每行 `li` 的第一个子元素；`2` 只能来自那里，不是被内容里的数字碰巧满足
+    expect(
+      Array.from(container.querySelectorAll('li')).map((row) => row.firstElementChild?.textContent),
+    ).toEqual(['1', '2', '3'])
+  })
+
+  it('空行渲染为空串，不补填充字符', () => {
+    const value = '{\n\n  "a": 1\n\n}'
+    const { container } = render(<JsonCode value={value} />)
+
+    // 5 行：`{` / 空 / `  "a": 1` / 空 / `}`
+    expect(linesOf(container)).toHaveLength(5)
+    // 直接钉住失效形态：给空行补 `' '` 就会让这两条立刻变红
+    expect(linesOf(container)[1]).toBe('')
+    expect(linesOf(container)[3]).toBe('')
+    // 且整体仍与原文逐字符相等（原文里那两个空行就是什么都没有）
+    expect(linesOf(container).join('\n')).toBe(value)
   })
 
   it('无法解析时降级为纯文本，不抛异常也不上色', () => {
@@ -984,7 +1000,7 @@ function toLines(segments: readonly Segment[]): Segment[][] {
 - [ ] **Step 4: 跑用例确认通过**
 
 Run: `npx vitest run --project ui src/framework/ui/JsonCode.test.tsx`
-Expected: PASS（5 条）。
+Expected: PASS（6 条）。
 
 - [ ] **Step 5: 提交**
 
@@ -1003,6 +1019,7 @@ git commit -m "feat(ui): 只读 JSON 视图 JsonCode（token 着色 + 解析失�
 
 **Files:**
 - Modify: `src/app/theme.css`
+- Test: `src/app/theme.test.ts`（新建）
 
 **Interfaces:**
 - Produces: CSS 变量 `--json-key` / `--json-string` / `--json-number` / `--json-literal` / `--json-punct`；样式类 `.json-key`、`.json-object`、`.json-array`、`.json-string`、`.json-number`、`.json-literal`、`.json-punct`、`.json-type`、`.json-tree-toggle`
@@ -1081,19 +1098,82 @@ git commit -m "feat(ui): 只读 JSON 视图 JsonCode（token 着色 + 解析失�
 }
 ```
 
-- [ ] **Step 3: 确认样式没写坏既有页面**
+- [ ] **Step 3: 给这份纯 CSS 加钉子**
+
+**为什么需要**：本任务没有任何自动化验证 —— 三种最可能的坏法都能让四道门禁全绿：① `var(--json-string)` 引用名拼错（或写成 `--json-strings`）→ 该 token 静默不着色；② 某个类漏写规则 → 那类 token 无色；③ 浅色块漏定义某个变量 → 浅色模式回退成暗色值。**jsdom 不加载外部 CSS，computed style 断言不可靠**，所以钉子只能是「读文件 + 渲染产物对照」。
+
+创建 `src/app/theme.test.ts`：
+
+```ts
+import { readFileSync } from 'node:fs'
+import { render } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
+import { JsonCode } from '@/framework/ui/JsonCode'
+
+const css = readFileSync(new URL('./theme.css', import.meta.url), 'utf8')
+const lines = css.split('\n')
+
+/** 取 `:root {` / `:root.light {` 块内文本，收到该块自己的 `}` 为止 */
+function blockOf(selector: string): string {
+  const start = lines.findIndex((line) => line.trim() === `${selector} {`)
+  expect(start, `theme.css 缺少 ${selector} {`).toBeGreaterThanOrEqual(0)
+  const end = lines.findIndex((line, index) => index > start && line.trim() === '}')
+  return lines.slice(start + 1, end).join('\n')
+}
+
+/** 全部「出现在 `{` 之前」的类选择器名 —— 分组选择器（`.a,\n.b {`）也能取到 */
+function declaredClasses(): Set<string> {
+  const names = [...css.matchAll(/([^{}]*)\{/g)].flatMap((rule) =>
+    [...rule[1].matchAll(/\.(json-[a-z-]+)/g)].map((match) => match[1]),
+  )
+  return new Set(names)
+}
+
+const JSON_VARS = ['--json-key', '--json-string', '--json-number', '--json-literal', '--json-punct']
+
+describe('theme.css 的 JSON 配色', () => {
+  it.each([':root', ':root.light'])('%s 里 5 个 --json-* 变量齐备', (selector) => {
+    const body = blockOf(selector)
+    for (const name of JSON_VARS) expect(body, `${selector} 缺少 ${name}`).toContain(`${name}:`)
+  })
+
+  it('每个 var(--json-*) 引用都有对应的变量定义', () => {
+    const defined = new Set([...css.matchAll(/(--json-[a-z-]+)\s*:/g)].map((match) => match[1]))
+    const referenced = [...css.matchAll(/var\((--json-[a-z-]+)\)/g)].map((match) => match[1])
+    expect(referenced.length).toBeGreaterThan(0) // 防止改名后正则失配、断言空转
+    for (const name of referenced) expect(defined, `引用了未定义的 ${name}`).toContain(name)
+  })
+
+  it('JsonCode 实际渲染出的每个着色类都有规则', () => {
+    // 从渲染产物反查，而不是手抄一份类名清单：改组件时这条会自己跟上
+    const { container } = render(<JsonCode value={'{"a":"b","c":1,"d":true,"e":null}'} />)
+    const used = new Set(
+      Array.from(container.querySelectorAll('[data-testid="json-code-line"] span'))
+        .map((node) => node.className)
+        .filter((name) => name.startsWith('json-')),
+    )
+    expect(used.size).toBeGreaterThan(0) // 一个类都没渲染时不许静默通过
+    for (const name of used) expect(declaredClasses(), `theme.css 缺少 .${name} 的规则`).toContain(name)
+  })
+})
+```
+
+**证明它有牙齿（mutation）**：写完用例跑一遍确认 PASS 后，**临时**把 `theme.css` 里 `.json-number` 那条规则删掉，再跑一次 —— 「JsonCode 实际渲染出的每个着色类都有规则」这条**必须变红**且失败信息点名 `json-number`；随后把 CSS 完整还原（`git diff --stat` 证明零残留）。把这段红输出贴进报告。
+
+- [ ] **Step 4: 确认样式没写坏既有页面 + 新用例全绿**
 
 Run: `npx vitest run --project ui src/app`
-Expected: PASS（app 层既有用例全绿；本步骤只确认 CSS 改动没有连带影响）。
+Expected: PASS（`theme.test.ts` 新用例 + app 层既有用例全绿）。
 
-- [ ] **Step 4: 提交**
+- [ ] **Step 5: 提交**
 
 ```bash
-git add src/app/theme.css
+git add src/app/theme.css src/app/theme.test.ts
 git commit -m "style(theme): JSON 着色变量与树形视图样式（深浅两套）
 
 - --json-* 五个变量同时定义在 :root（暗色默认）与 :root.light，禁止硬编码色值
-- 树形行的缩进与折叠开关样式；折叠开关可点区域与 hover 反馈对齐既有按钮"
+- 树形行的缩进与折叠开关样式；折叠开关可点区域与 hover 反馈对齐既有按钮
+- 补 theme.test.ts 钉子：变量双主题齐备、var(--json-*) 引用可解析、组件渲染出的类都有规则"
 ```
 
 ---
