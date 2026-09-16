@@ -75,8 +75,10 @@ jobs:
 
       - run: npm ci
 
-      # 签名与公证只预留配置位（环境变量注入）。未注入时产物未签名：
-      # macOS 首次启动需右键打开，Windows 无影响。
+      # 签名与公证只预留配置位（环境变量注入），未注入时产物未签名。
+      # 注意：2026-09-16 在本机实测两个 macOS 产物均过不了签名校验（arm64 缺 _CodeSignature、
+      # x64 完全没有签名且 spctl 判 rejected），因此「首次启动需右键打开」这条承诺**未经真机验证**，
+      # 别把它当已知可用 —— 详见验证报告 §9.5 与 manual-qa.md 执行记录 A 的偏差栏。
       - run: npm run tauri:build
 
       - uses: actions/upload-artifact@v4

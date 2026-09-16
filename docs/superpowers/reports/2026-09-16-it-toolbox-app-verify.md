@@ -200,7 +200,7 @@
 | --- | --- | --- |
 | **W1** 无输入工具仍占输入区 | `ToolLayout` 的 `input` 省略时**整个输入面板不渲染**，输出占满整宽；原「说明文案借输入面板占位」的做法改为新增的可选 `note` 槽位。四个无输入工具全部改完：`uuid` / `ulid` / `token` / `rsa-key` 生成器（不止 UUID 一个） | `ToolLayout.tsx`（`note` + `props.input !== undefined` 条件渲染）、四个工具 `input={…}` → `note={…}`；`ToolLayout.test.tsx` 新增 2 条 |
 | **W2** 可编辑输入区对 `errorLine` 无反应 | 可编辑分支同样消费 `effectiveErrorLine`：容器 `data-error`、`textarea` 加 `aria-invalid` + 错误底色、右上角显示「第 N 行」角标。**形态边界如实记录：可编辑态是「整区标记 + 行号角标」，逐行高亮依旧只在只读视图** —— spec 只要求「给出可见标记」，故不再假称逐行 | `CodeArea.tsx`；`CodeArea.test.tsx` 新增 3 条（含 `errorOffset` 兜底换算与「无错误时不出现任何标记」） |
-| **W4** 四平台 CI 矩阵未落地 | 新增 `.github/workflows/build.yml`：`verify`（lint / typecheck / test / build，含产物外发扫描）+ `bundle` 四平台矩阵（`macos-14`→dmg arm64、`macos-13`→dmg x64、`windows-latest`→nsis x64、`windows-11-arm`→nsis arm64），带 `concurrency` 取消旧跑批、Rust 缓存与产物上传。**runner 行为本机无法验证**：已用 js-yaml 解析确认结构、矩阵与设计文档 §6.3 逐项一致，首次真实跑批需在 GitHub 上观察（`manual-qa.md` 的 `9.4` 因此仍算未执行） | `.github/workflows/build.yml` |
+| **W4** 四平台 CI 矩阵未落地 | 新增 `.github/workflows/build.yml`：`verify`（lint / typecheck / test / build，含产物外发扫描）+ `bundle` 四平台矩阵（`macos-14`→dmg arm64、`macos-13`→dmg x64、`windows-latest`→nsis x64、`windows-11-arm`→nsis arm64），带 `concurrency` 取消旧跑批、Rust 缓存与产物上传。**runner 行为本机无法验证**：已用 js-yaml 解析确认结构、矩阵与设计文档 §6.3 逐项一致，首次真实跑批需在 GitHub 上观察。（`manual-qa.md` 的 `9.4` 另有进展：macOS 两架构已在 arm64 本机真跑完，见 §9.5 —— 该条由「未执行」变为「部分执行」） | `.github/workflows/build.yml` |
 | **W5** 五处覆盖缺口 | ① `scripts/scan-egress.mjs` 支持 `SCAN_EGRESS_DIST` 注入 → 新增**脚本级用例**（干净产物 exit 0 / `fetch(` exit 1 并报行号 / 远程 URL 只告警 / 允许清单不计 / 目录缺失 exit 1），并为此加 `scripts` project；② `offline-guard` 补 XHR 拦截、本机放行、控制台提示 3 条；③ 收藏持久化补「模块重载后从 storage 回读」；④ `registry` 校验失败路径补 11 条合成用例；⑤ 死代码 `useToolState.reset()` 接入 `json-diff` 的「清空」（现在会连带抹掉该工具已落盘的快照） | 见 9.3 的新文件清单与新增用例 |
 | **W6** `json-format` 两条断言咬合力弱 | 先钉「确实切到了树形视图」（`aria-pressed`），再断言无 `json-tree` —— 删掉树分支不再能照样绿 | `json-format/Tool.test.tsx` |
 | **S1**（优先 4 项） | UUID 格式开关**组合态**（关连字符 + 开大写）；Markdown「复制 HTML 源码」真正点复制并断言剪贴板内容与「已复制」反馈；新建 `useToolState.test.ts` 直接钉「恢复上次输入」与「状态互不污染」；全局快捷键补「工具输入框内容前后逐字符不变」 | 见 9.3 |
@@ -215,6 +215,7 @@
 | **W8** | **注册校验对非法 meta 会多报一条自相矛盾的 `orphan-tool`**（「有 Tool.tsx 但缺少 meta.ts」，而它明明有 meta.ts）：`continue` 跳过了「把该目录从孤儿候选里摘掉」那一步。真实目录结构下不可能出现非法 meta，故这条噪声长期无人发现 | 已修：凡该目录的 meta.ts 存在（含导出非对象的分支）都先从 `toolByDirectory` 摘除；`registry.build.test.ts` 用混合场景（合法 + 非法 + 真孤儿）做回归钉子。**这条是新增用例当场咬出来的，不是读代码读出来的** |
 | **W9** | W6 补断言使 `json-format/Tool.test.tsx` 行号位移（+3 / +6），计划覆盖表里 3 处 `文件:行` 引用随之失效 | 已校准（`275→278`、`299→305`、`321→327`）。**本报告 §5 的 W1/W2 证据行号指向修复前的代码，不回改**（那是 `77e1352` 时的快照），以本节为准 |
 | — | `README.md` 的「单测分两个 project」在新增 `scripts` project 后已不成立 | 已改为三个 project 并说明各自环境 |
+| **W10** | **两个 macOS 产物的签名状态不一致，且都过不了校验**：arm64 是 adhoc/linker-signed 但包内无 `_CodeSignature`（`codesign --verify` 退出码 1）；**x64 连签名都没有**（`code object is not signed at all`，`spctl --assess` 退出码 3 = `rejected, source=no usable signature`）。设计文档 `:437` 承诺「未签名产物首次启动需右键打开」，但该路径**从未验证**；对「完全未签名」的 x64，「仍然打开」是否可行、还是会被判为「已损坏」，未知 | 未改代码（`signingIdentity` 本就没配，属预期配置；**x64 缺 adhoc 签名是交叉编译路径的实现事实**）。已如实登记到 `manual-qa.md` 执行记录 A 的偏差栏与 §9.5；**待决策**：要么补签名/公证，要么在 README 明确「macOS 产物未签名、分发路径未验证」 |
 
 ### 9.3 本轮门禁（控制器实测）
 
@@ -230,7 +231,51 @@
 
 ### 9.4 仍未闭合（如实列出）
 
-- **`manual-qa.md` 的 4 条实机验收**（`9.3` 断网冒烟、`9.4` 四平台构建、`9.6` 跨 WebView、`9.10` Windows 前置条件）**仍未执行**，需要真机 / 真断网 / Windows 环境。新加的 CI 只是把 `9.4` 变成「可以在 CI 上做」，**不等于做过** —— 首次跑批结果需回填该文件。
+- **`manual-qa.md` 的 4 条实机验收**：`9.4` 的 **macOS 两架构已执行**（§9.5），状态由「未执行」改为「**部分执行**」（Windows 两架构仍缺）；`9.3` **仍为未执行**（本轮只补了运行期旁证，17 工具走查是它的主体）；`9.6`（跨 WebView，需 Windows 一侧）与 `9.10`（Windows 前置条件）**仍为未执行**。新加的 CI 只是把 Windows 两架构与 `9.4` 全量变成「可以在 CI/Windows 上做」，**不等于做过** —— 首次跑批结果需回填该文件。
 - **W1/W2 的形态边界**：可编辑输入区是「整区标记 + 行号角标」而非逐行高亮（见 9.1）。
 - **S1 的其余「部分」条目**（`app-shell` 的窗口断点、懒加载证据、Tauri 剪贴板回退分支等）与 **S5**（`image-tools` 的 PNG 落盘 / 复制图片 / 彩色码扫码建议在 `manual-qa.md` 补专用手测项）未逐条处理。
 - **`scan-egress` 的允许清单**目前是 5 条正则的白名单：新增依赖若引入新的合法远程字面量，告警数会上升（不致命），需要人工判断是否入清单。
+
+### 9.5 实机验收原始数据（2026-09-16 归档后，脚本化部分）
+
+环境：macOS **26.3.1**（BuildVersion `25D771280a`）、**arm64**、Node **v23.7.0**、rustc **1.96.0**。执行方式：脚本化，**无 GUI 交互**（未做窗口操作、未截图）。记录同步回填到 `manual-qa.md`「执行记录 A/B」。
+
+**构建（`9.4` 的 macOS 两架构）**
+
+| 架构 | 命令 | 产物 | 体积 | 构建 |
+| --- | --- | --- | --- | --- |
+| arm64 | `npm run tauri:build` | `src-tauri/target/release/bundle/dmg/IT Toolbox_0.1.0_aarch64.dmg` | 2,362,828 B（2.25 MiB） | PASS（`Finished release profile in 50.36s`） |
+| x64 | `npm run tauri:build -- --target x86_64-apple-darwin` | `src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/IT Toolbox_0.1.0_x64.dmg` | 2,487,009 B（2.37 MiB） | PASS（先 `rustup target add x86_64-apple-darwin`） |
+
+两个体积都远低于 15MB 上限；`lipo -info` 确认包内可执行文件分别为 `arm64` / `x86_64` 单一架构（**不是** universal 包，与四平台矩阵的设计一致）。
+
+**签名与 Gatekeeper 判定（两个产物都失败，且失败方式不同）**
+
+| 产物 | `codesign --verify` | `spctl --assess --type execute -vv` |
+| --- | --- | --- |
+| arm64 | 退出码 **1**：`code has no resources but signature indicates they must be present` | 退出码 **1**，同一消息 |
+| x64 | 退出码 **1**：**`code object is not signed at all`**（`In architecture: x86_64`） | 退出码 **3**：**`rejected` / `source=no usable signature`** |
+
+**启动证据（两架构各一份，均在本机、无 quarantine）**
+
+| 检查 | arm64 | x64 |
+| --- | --- | --- |
+| 进程存活（18s 后） | 是 | 是（Rosetta 下，`arch -x86_64` 可用） |
+| `lsappinfo` 注册 | `type="Foreground"`、`Version="0.1.0"`、`Arch=ARM64` | `type="Foreground"`、`Version="0.1.0"`、`Arch=x86_64` |
+| WebView 创建 | 随启动新出现 3 个以本应用命名的 WebKit XPC 进程（`Networking` / `GPU` / `WebContent`） | 同左 |
+| 网络 socket | 应用进程 + 3 个 WebKit 进程 **各 0 条** | 同左 |
+| 运行期 stderr/stdout | 空 | 空 |
+
+「新出现」用启动前后 `pgrep -f com.apple.WebKit` 的**集合差集**取得，并逐个 `ps -p <pid>` 校验 PID 有效后才计入结论 —— 第一次尝试直接 `pgrep` 时抓到的是 PID 906~954 那批（属于别的应用，含 IDE 自带 WebKit），**不可归属，已弃用不计**。
+
+**过程自查（两次假绿，都发生在同一处）**
+
+`zsh` 不对未加引号的变量做分词：`for pid in $NEW` 把多个 PID 当成**一个**参数传给 `lsof`，`lsof` 报「无此进程」→ 输出为空 → 被读成「0 个网络 socket」。**第一次我还把它当成结论汇报了，随后自查发现并重做**；最终改用 `bash -c`（强制分词）+ PID 有效性校验 + 非空断言。对「0 出网」这种**结论依赖空输出**的检查，假绿与真绿长得一模一样 —— 这条已写进 `manual-qa.md` 供下次执行者避开。
+
+**本次没有验证的（不得从上面的数据推出）**
+
+1. 「分发给他人后首次启动」：未构造 quarantine、未走 Finder 双击/右键打开、系统设置里的「仍要打开」也未试；
+2. 界面可用性：未做任何窗口操作（窗口几何查询需辅助功能授权，`osascript` 返回 `-1719 不允许辅助访问`，未申请该权限）；
+3. 17 个工具的逐个操作（`9.3` 主体）；
+4. 文件拖放、剪贴板、WebCrypto 的**真机**行为（`9.6`）；
+5. 任何 Windows 侧行为（构建、WebView2、`webviewInstallMode = skip` 的失败提示，即 `9.4` 的 Windows 两格与 `9.10`）。
