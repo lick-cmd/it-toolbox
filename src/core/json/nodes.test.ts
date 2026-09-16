@@ -97,7 +97,8 @@ describe('buildJsonNodes', () => {
     }
 
     expect(levels).toBe(DEPTH - 1)
-    expect(node.kind).toBe('array')
+    // `node` 在循环体内被赋为 JsonNode，窄化在此处已失效，需重新收窄才能读 items
+    if (node.kind !== 'array') throw new Error(`期望停在内层数组，实际是 ${node.kind}`)
     expect(node.items).toHaveLength(0)
   })
 })
