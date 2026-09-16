@@ -162,13 +162,11 @@ export default function TokenGeneratorTool() {
           </Field>
         </>
       }
-      input={
-        <div className="p-2.5 text-[12px] text-muted">
-          <p>
-            随机值取自 <span className="code-text text-fg">crypto.getRandomValues</span>
-            ，逐字符等概率选取，不引入取模偏差；自定义字符集会先去重，避免个别字符被重复计权。
-          </p>
-        </div>
+      note={
+        <p>
+          随机值取自 <span className="code-text text-fg">crypto.getRandomValues</span>
+          ，逐字符等概率选取，不引入取模偏差；自定义字符集会先去重，避免个别字符被重复计权。
+        </p>
       }
       output={
         blockingError ? (

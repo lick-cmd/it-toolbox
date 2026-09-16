@@ -63,10 +63,35 @@ describe('CodeArea（可编辑视图）', () => {
     expect(onChange).toHaveBeenCalledWith('xy')
   })
 
-  it('可编辑状态不渲染行号列表（定位只在只读视图生效）', () => {
+  it('可编辑状态不渲染行号列表（逐行高亮只在只读视图提供）', () => {
     render(<CodeArea value={'a\nb'} />)
 
     expect(screen.queryByRole('list')).toBeNull()
+  })
+
+  // W2 的钉子：可编辑输入区此前对 errorLine 完全不响应，而全仓唯一传 errorLine 的
+  // json-diff 正是可编辑态 —— 即 spec「输入区高亮错误位置」在界面上名存实亡。
+  it('可编辑态传 errorLine 时给出可见标记与行号角标', () => {
+    const { container } = render(
+      <CodeArea label="输入" value={'a\nb\nc'} onChange={() => {}} errorLine={2} />,
+    )
+
+    expect(container.querySelector('[data-error]')).not.toBeNull()
+    expect(screen.getByText('第 2 行')).toBeDefined()
+    expect(screen.getByLabelText('输入').getAttribute('aria-invalid')).toBe('true')
+  })
+
+  it('可编辑态只给 errorOffset 时同样换算出行号并标记', () => {
+    render(<CodeArea value={'aaaa\nbbbb'} errorOffset={6} />)
+
+    expect(screen.getByText('第 2 行')).toBeDefined()
+  })
+
+  it('可编辑态无错误时不出现任何错误标记', () => {
+    const { container } = render(<CodeArea value={'a\nb'} />)
+
+    expect(container.querySelector('[data-error]')).toBeNull()
+    expect(screen.queryByText(/第 \d+ 行/)).toBeNull()
   })
 })
 

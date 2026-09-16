@@ -95,13 +95,11 @@ export default function UlidGeneratorTool() {
           />
         </>
       }
-      input={
-        <div className="p-2.5 text-[12px] text-muted">
-          <p>
-            ULID 的前 10 个字符是 48 位毫秒时间戳，因此按字典序排列即为时间顺序。同一毫秒内
-            连续生成时递增随机段，溢出则推进到下一毫秒，保证严格单调。
-          </p>
-        </div>
+      note={
+        <p>
+          ULID 的前 10 个字符是 48 位毫秒时间戳，因此按字典序排列即为时间顺序。同一毫秒内
+          连续生成时递增随机段，溢出则推进到下一毫秒，保证严格单调。
+        </p>
       }
       output={
         blockingError ? (

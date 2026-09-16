@@ -23,8 +23,36 @@ describe('ToolLayout', () => {
   })
 
   it('body 显式为 undefined 时回落到标准形态', () => {
-    render(<ToolLayout body={undefined} output={<p>右侧输出</p>} />)
+    render(<ToolLayout body={undefined} input={<p>左侧输入</p>} output={<p>右侧输出</p>} />)
     expect(screen.getByText('输入')).toBeDefined()
+    expect(screen.getByText('输出')).toBeDefined()
+  })
+
+  // spec「无输入工具隐藏输入区：输入区不占据界面空间」的落点。
+  // 旧实现无条件渲染输入面板、靠说明文案占位，本条即那处偏差的钉子。
+  it('省略 input 时输入面板整个不渲染，输出占满整宽', () => {
+    render(<ToolLayout output={<p>右侧输出</p>} />)
+
+    expect(screen.queryByText('输入')).toBeNull()
+    expect(screen.getByText('输出')).toBeDefined()
+    expect(screen.getByText('右侧输出')).toBeDefined()
+    // 连并排容器里的输入槽位都不存在（避免「渲染了空面板所以查不到文本」的假绿）
+    expect(screen.queryByText('左侧输入')).toBeNull()
+  })
+
+  it('note 槽位渲染工具说明文案，且与 options / status 共存', () => {
+    render(
+      <ToolLayout
+        note={<p>本工具全程离线</p>}
+        options={<span>附加选项</span>}
+        status={<span>状态行</span>}
+        output={<p>右侧输出</p>}
+      />,
+    )
+
+    expect(screen.getByText('本工具全程离线')).toBeDefined()
+    expect(screen.getByText('附加选项')).toBeDefined()
+    expect(screen.getByText('状态行')).toBeDefined()
     expect(screen.getByText('输出')).toBeDefined()
   })
 

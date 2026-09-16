@@ -26,7 +26,7 @@ export function CodeArea({
   className,
 }: CodeAreaProps) {
   // errorLine 优先（调用方已完成换算）；只给 errorOffset 时在此兜底换算 —— 否则该对外参数
-  // 会静默无效。注意：定位只在**只读视图**生效，可编辑 textarea 不显示任何高亮。
+  // 会静默无效。两条分支都消费它：只读视图逐行标错，可编辑视图给整区标记 + 行号角标。
   const effectiveErrorLine =
     errorLine ?? (errorOffset === undefined ? undefined : lineOfOffset(value, errorOffset))
 
@@ -65,23 +65,37 @@ export function CodeArea({
     )
   }
 
+  // 可编辑 textarea 无法逐行着色，故给出「整区可见标记（data-error + 错误底色 + aria-invalid）
+  // + 出错行号角标」；逐行高亮仍只在只读视图提供。spec 只要求「输入区在对应行或字符位置给出
+  // 可见标记」，角标指明的就是该行号 —— 形态边界记在验证报告里，不假称逐行高亮。
+  const hasError = effectiveErrorLine !== undefined
+
   return (
-    <textarea
-      aria-label={label}
-      value={value}
-      readOnly={readOnly}
-      rows={rows}
-      spellCheck={false}
-      autoCapitalize="off"
-      autoCorrect="off"
-      placeholder={placeholder}
-      onChange={(event) => onChange?.(event.target.value)}
-      className={[
-        'code-text w-full resize-none border-0 bg-transparent p-2.5 outline-none',
-        'placeholder:text-muted/70',
-        className ?? '',
-      ].join(' ')}
-    />
+    <div className="relative flex min-h-0 flex-col" data-error={hasError || undefined}>
+      <textarea
+        aria-label={label}
+        aria-invalid={hasError || undefined}
+        value={value}
+        readOnly={readOnly}
+        rows={rows}
+        spellCheck={false}
+        autoCapitalize="off"
+        autoCorrect="off"
+        placeholder={placeholder}
+        onChange={(event) => onChange?.(event.target.value)}
+        className={[
+          'code-text w-full resize-none border-0 p-2.5 outline-none',
+          hasError ? 'bg-danger/10' : 'bg-transparent',
+          'placeholder:text-muted/70',
+          className ?? '',
+        ].join(' ')}
+      />
+      {hasError && (
+        <span className="pointer-events-none absolute top-1.5 right-1.5 rounded-sm bg-danger/20 px-1.5 py-0.5 text-[11px] text-danger">
+          第 {effectiveErrorLine} 行
+        </span>
+      )}
+    </div>
   )
 }
 

@@ -138,8 +138,8 @@ export default function RsaKeyGeneratorTool() {
           </Button>
         </>
       }
-      input={
-        <div className="p-2.5 text-[12px] text-muted">
+      note={
+        <>
           <p>
             密钥在你自己的设备上用 WebCrypto 生成，全程不发往任何服务器。私钥只保留在当前
             会话的内存中，刷新或重新打开工具后需要重新生成。
@@ -148,7 +148,7 @@ export default function RsaKeyGeneratorTool() {
             1024 位已不足以抵抗现代算力，仅用于兼容旧系统；一般用途选 2048 位，长期用途选 3072
             位以上。
           </p>
-        </div>
+        </>
       }
       output={
         error !== null ? (

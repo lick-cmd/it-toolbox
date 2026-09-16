@@ -140,19 +140,17 @@ export default function UuidGeneratorTool() {
           </button>
         </>
       }
-      input={
-        <div className="p-2.5 text-[12px] text-muted">
-          {version === 1 ? (
-            <p>
-              v1 基于时间戳与节点 ID 生成。本应用的节点 ID 为<strong className="text-fg">会话级随机值</strong>（已按
-              RFC 4122 置 multicast 标志），并非本机网卡地址 —— 运行环境无法获取该信息。
-            </p>
-          ) : version === 4 ? (
-            <p>v4 完全随机生成，不含时间或位置信息。</p>
-          ) : (
-            <p>v7 以毫秒时间戳开头，因而按字典序排列即为时间顺序；同一毫秒内保持单调递增。</p>
-          )}
-        </div>
+      note={
+        version === 1 ? (
+          <p>
+            v1 基于时间戳与节点 ID 生成。本应用的节点 ID 为<strong className="text-fg">会话级随机值</strong>（已按
+            RFC 4122 置 multicast 标志），并非本机网卡地址 —— 运行环境无法获取该信息。
+          </p>
+        ) : version === 4 ? (
+          <p>v4 完全随机生成，不含时间或位置信息。</p>
+        ) : (
+          <p>v7 以毫秒时间戳开头，因而按字典序排列即为时间顺序；同一毫秒内保持单调递增。</p>
+        )
       }
       output={
         countError ? (
