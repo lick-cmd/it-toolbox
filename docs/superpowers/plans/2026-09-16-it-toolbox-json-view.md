@@ -1975,5 +1975,66 @@ git commit -m "docs(tasks): 第 10 组 JSON 视图优化完成（10.1–10.10）
 
 ## 执行记录
 
-（执行时逐条填写：每条 Scenario → 具体 `it` 用例名、实测判定方式、关键发现与口径更正。）
+由 Task 10 填写。**BASE = `55e9ed6`。** 下表每行是「Scenario 逐字名 → 钉住它的 `it` 用例名（逐字）→ 文件:行 → 本次实测判定方式」。行号取自 BASE 提交后的工作树；「实测判定方式」区分「既有用例 + 我复跑确认它确实钉住这条 Scenario」与「该 Scenario 无对应用例、是例外」。
+
+### 覆盖表（12 条 Scenario 逐条落到用例）
+
+#### `dev-tools`：「JSON 树形视图」（8 条）
+
+| Scenario 名（逐字） | 钉住它的 `it` 用例名 | 文件:行 | 实测判定方式 |
+| --- | --- | --- | --- |
+| 逐个折叠子项 | `折叠某个子项后其子孙消失，并显示含元素个数的摘要` | `src/framework/ui/JsonTree.test.tsx:26` | 既有用例，复跑确认。它点「折叠 $.a」后同时断言三件事：行数 3（子项收起）、`{…} 2 键` 摘要出现、开关 `aria-expanded=false`；同级 `$.d` 仍在（父/同级不受影响）。摘要素材另由核心 `tree.test.ts:56`「折叠摘要给出元素个数，空容器如实显示」钉住（`{…} 2 键` / `[…] 3 项`），工具内可用性由 `json-format/Tool.test.tsx:241`「切到树形后展示可折叠节点，折叠后显示摘要」钉住。 |
+| 折叠状态按节点独立 | `折叠状态按节点独立，互不影响` | `src/framework/ui/JsonTree.test.tsx:37` | 既有用例，复跑确认。折叠 `$.a` → 折叠 `$.c` → 展开 `$.a`，断言 `$.c` 仍 `aria-expanded=false` 而 `$.a` 为 `true`——「展开另一个节点不动已折叠的节点」正是这条主张。核心侧由 `tree.test.ts:261`「折叠某节点后其子孙全部不可见，且只影响该节点」钉住折叠语义。 |
+| 类型标签口径一致 | `类型口径与 collectTypeHints 逐节点一致`；`树的前序类型标签序列与 collectTypeHints 完全一致` | `src/core/json/tree.test.ts:189`；`src/core/json/tree.test.ts:314` | 既有用例，复跑确认。前者对整棵树逐节点比对 `collectTypeHints` 的 `path → type/label`（数量相等且一一对应），后者比对前序标签序列整体相等——「两个视图类型标签一一对应」的直接钉子。界面确已画出标签由 `JsonTree.test.tsx:20`「默认展开全部节点并展示类型标签」钉住。 |
+| 标量保留原文转义 | `标量取原文切片，不做规范化`；`树形显示的标量与源码原文逐字符一致（转义不被规范化）` | `src/core/json/tree.test.ts:25`；`src/tools/dev/json-format/Tool.test.tsx:299` | 既有用例，复跑确认。核心用例断言 `\u0041` / `1e2` / `a\/b` 的 `raw` 逐字保持原文；集成用例在真工具里先看源码视图再看树视图，断言树里仍是 `"\u0041"`、`1e2` 且 `queryByText('"A"')` 为 `null`——正是「不得显示为规范化后的等价写法」。 |
+| 全部展开与全部折叠 | `全部折叠后除根以外全部收起，全部展开后恢复` | `src/framework/ui/JsonTree.test.tsx:49` | 既有用例，复跑确认。点「全部折叠」后行数 3（除根外容器收起）、点「全部展开」后行数 4（恢复全展开）。折叠路径集合由核心 `tree.test.ts:333`「给出除根以外全部容器路径，供「全部折叠」使用」钉住（根不折）。 |
+| 大体积输入 | `大输入默认只展开第一层，并如实提示渲染上限` | `src/framework/ui/JsonTree.test.tsx:74` | 既有用例，复跑确认。2010 个单元素数组 + `maxRows={20}`，断言出现 `仅渲染前 20 行` 提示、只画 20 行、折叠子数组显示 `[…] 1 项`——「只渲染已展开路径 + 超上限明确提示 + 不无响应」的三点合一。核心侧由 `tree.test.ts:292`「大输入默认只展开第一层」与 `tree.test.ts:282`「超过行数上限时截断并如实标记」钉住。 |
+| 非法输入与空输入 | `非法输入时树形视图显示错误而非节点`；`空输入时树形视图显示空态` | `src/tools/dev/json-format/Tool.test.tsx:264`；`src/tools/dev/json-format/Tool.test.tsx:275` | 既有用例，复跑确认。非法输入切树形后 `[data-testid="json-tree"]` 为 `null` 且 `role=alert` 存在；空输入切树形显示「尚未输入」。「不展示任何节点」由这两条分别钉住（**注意**：`json-tree === null` 本身不咬人，真正咬人的是 `alert` 断言，见下方非阻塞观察）。 |
+| 复制与下载不受视图影响 | `复制与下载给的是完整原文，不含树形的装饰标记`；`树形视图同样给出复制与下载入口` | `src/tools/dev/json-format/Tool.test.tsx:321`；`src/tools/dev/json-format/Tool.test.tsx:253` | 既有用例，复跑确认。前者切树形后点「复制」，断言 `navigator.clipboard.writeText` 收到的是 `'{\n  "a": {\n    "b": 1\n  }\n}'`（完整格式化原文，无 `▾`/路径/类型标签等装饰）；后者断言树形视图下「复制」「下载」入口仍在。**这条剪贴板用例即下方例外 4（`vi.stubGlobal` 未还原）所在处**，本文件其余 22 条不点「复制」，当前无污染。 |
+
+#### `tool-registry`：「JSON 只读视图的语法高亮」（4 条）
+
+| Scenario 名（逐字） | 钉住它的 `it` 用例名 | 文件:行 | 实测判定方式 |
+| --- | --- | --- | --- |
+| 统一的只读 JSON 视图 | `输出区由框架层着色视图呈现`（×4）；`两个新原语都能从 index 导入并渲染` | `src/tools/dev/json-format/Tool.test.tsx:231`；`src/tools/dev/json-minify/Tool.test.tsx:94`；`src/tools/converter/yaml-to-json/Tool.test.tsx:52`；`src/tools/web/jwt-parser/Tool.test.tsx:136`；`src/framework/ui/JsonCode.test.tsx:70` | 既有用例，复跑确认。spec 点名的 4 处只读视图各有一条用例，断言输出区存在 `[data-testid="json-code"] .json-string`——四处的呈现同属一个框架组件；桶导出用例再从 `framework/ui/index.ts` 导入并渲染，钉住「框架层统一提供」。各 `Tool.tsx` 已无自带着色逻辑（只 import `JsonCode`）。 |
+| 高亮不改变文本 | `按 token 类别着色，且渲染文本与原文逐字符相等`；`多行输入按行渲染且带行号`；`空行渲染为空串，不补填充字符` | `src/framework/ui/JsonCode.test.tsx:15`；`src/framework/ui/JsonCode.test.tsx:33`；`src/framework/ui/JsonCode.test.tsx:44` | 既有用例，复跑确认。三条都把内容列（`json-code-line`）拼回升降后的字符串并与原文 `value` 做 `===`，且排除行号列——「选中/复制得到与未着色逐字符一致」的直接钉子；空行用例还钉住「不补填充字符」。 |
+| 无法解析时降级 | `无法解析时降级为纯文本，不抛异常也不上色` | `src/framework/ui/JsonCode.test.tsx:57` | 既有用例，复跑确认。输入 `{"a":}`，断言无 `.json-string`（不上色）且内容列拼回仍等于原文、渲染不抛异常——「无法解析 → 等宽纯文本、不报错、不影响其他部分」。JWT 载荷解析失败走的是工具层 `<pre>` 分支，另由 `jwt-parser/Tool.test.tsx:119`「载荷非法 JSON 时提示载荷失败但仍展示头部」钉住。 |
+| 离线可用 | **（无独立用例——例外）** | — | **例外，不是遗漏**：环境构造不出来（单测里无法真断网）。由「零新增运行时依赖」（`package.json` 依赖表未新增，着色依赖 `scanJson` 自研）与 `npm run build` 的 `scripts/scan-egress.mjs` 产物扫描共同保证；Task 10 实测 `npm run build` 末行输出 `[scan-egress] 网络 API 调用 0 处；远程 URL 字面量 7 处` + `[scan-egress] 通过：产物中未发现外发能力。`（那 7 处字面量全部是被复制的示例文本/React 错误提示 URL，非网络 API 调用）。真实断网行为在 9.3 实机冒烟里验。同类先例：`core/json/parse.ts` 的 `TOO_DEEP` 分支。 |
+
+**结论**：12 条 Scenario 中 11 条有对应用例且复跑全绿，1 条（`tool-registry`「离线可用」）是环境构造不出来的例外。**无缺口清单**——未新增/删除任何用例，未改动任何产品代码或用例文件。
+
+### 关键发现与口径更正（逐条如实记录，评审与归档时读）
+
+计划文案与实测不符处，均已按实测改准：
+
+1. **Task 1 / Ruling 6**：计划断言 `expect(built.error).toContain('值')` **不可满足** —— scanner 的 19 条 `error` 文案没有一条含「值」（「值」只作为 UNCLOSED 分支的 `detail` 出现），而 `buildJsonTree` 对非法输入是 `return parsed` 直传。改为 `expect(built.error).not.toBe('')`（保留用例名意图与 `built.line` 检查，不绑具体文案）。代价：该用例不再验证「错误文案被原样透传」。
+2. **Task 1 / Ruling 8**：计划的 `skipSubtree` 有 **off-by-one** —— 进入时游标位于容器**内容**起点（开括号已被调用方消费），原实现先 `cursor++` 再判 `depth === 0`，导致第一个闭合符把 depth 打成 −1 并再也回不到 0，该节点与**全部祖先**（含 root）的 `raw` 塌成空串；原「超深嵌套」用例恰好让内容以开括号开头、走的是正确路径，所以没拦住。采纳守卫 `if ((raw === '}' || raw === ']') && depth === 0) return`。**Ruling 9**：把诊断条提升为第 10 条正式用例（计划文案「9 条」→「10 条」）。
+3. **Task 4 / Ruling 17**：为「纯 CSS 交付物」补了一自动门禁 → Task 4 从 1 个文件变 2 个文件（多 `src/app/theme.test.tsx`）；另把 mutation 的还原手法从 `git checkout --`（会连带回退未提交的 Step 1/2）改为「sha256 → 手工还原 → sha256 复核」，并把**已实测的红输出形态**写进计划作为期望值。另有一轮命名修正 `c009f21`。
+4. **Task 5 / Ruling 18**：`src/app/theme.test.tsx` 追加渲染 `JsonTree` 的对照断言，输入一次覆盖 9 个类并 `expect(used).toHaveLength(9)`（钉住「组件实际用到的类清单」）；计划镜像 `e4569e4` 修正 Task 5 两处无解的用例期望（「折叠不动同级」「开关名是动作语义」）。Task 5 的 Files 因此变成 3 个（与 Task 4 共享 `theme.test.tsx`）。
+5. **Task 7 / Ruling 21**：计划 Step 1 原写「Expected: 部分用例 FAIL」**物理上不可达** —— 那一刻输出仍是 `CodeArea`、文本尚未被切分，基线本就全绿（实测 40/40）。真实顺序是「基线绿 → 替换源码 → RED 2/3 条 → 改断言 → 绿 44」。**这不是实现者的偏差，是计划的预期写错了**（已改准）。
+6. **Task 8 / Ruling 23**：Task 5 评审遗留的「手动折叠会不会被无关重建抹掉」被 Task 8 的复核**实测证伪** —— `JsonTree.tsx` 的 `useEffect` 依赖 `tree.collapsedByDefault`（每次调用都是新数组实例）→ 树视图下点「4 空格」就会把用户的手动折叠抹掉。依赖缩为 `[tree.root.raw]`，并补两条钉子（`ec78d21`）。
+7. **本任务**：计划原写「文件数 63 → 66（tree / JsonCode / JsonTree 三个新用例文件）」，实为 **63 → 67（4 个新用例文件：`core/json/tree.test.ts`、`framework/ui/JsonCode.test.tsx`、`app/theme.test.tsx`、`framework/ui/JsonTree.test.tsx`）**、用例总数 **812 → 820**（树视图 4 条 → 816、折叠重置 2 条 → 818、不变量 2 条 → 820）。Step 2 的条数文案已在 `55e9ed6` 改准。
+
+### 已知例外 / 未处理项（明确记为例外，不是遗漏）
+
+1. `tool-registry` 的「离线可用」：环境构造不出来，由「零新增运行时依赖」+ `npm run build` 的 `scripts/scan-egress.mjs` 产物扫描共同保证，真实断网留 9.3 实机冒烟。
+2. 树形视图下「树形视图」这串字出现两次（输出区标题 + `JsonTree` 的 `sr-only` label）：文案重复无害，未处理；**后续写用例别用 `getByText('树形视图')`**（会命中两个元素）。
+3. `JsonTree` 在**切走视图再切回**时会因组件卸载丢失手动折叠：这不是缺陷（组件已卸载），复核明确「不升级」；已修的是「文档没变、只是重建」那条（`fix(ui)` 提交 `ec78d21`）。
+4. `json-format/Tool.test.tsx` 末尾那条剪贴板用例用 `vi.stubGlobal('navigator', …)` 且**未**在该文件内还原（jsdom 30 的 `navigator.clipboard` 是 getter-only，`Object.assign` 会抛 `TypeError: Cannot set property clipboard…`，故改用仓库先例 `src/framework/clipboard.test.ts:17-19`）。当前无污染（该 describe 在文件末尾，其余 22 条都不点「复制」）；**日后若在其后追加用例，需补 `afterEach(() => vi.unstubAllGlobals())`**。
+
+### 两条非阻塞观察（reviewer-task-8 提出）
+
+- `json-format/Tool.tsx` 的 `tree === null || !tree.ok` 分支实测不可达（防御）但为类型收窄所必需，保留。
+- `json-format/Tool.test.tsx` 里「非法输入时树形视图显示错误而非节点」那条，`json-tree === null` 本身不咬人（占位也会为 null），真正咬人的是 `alert` 断言。
+
+### 门禁实测（Task 10 Step 2）
+
+| 命令 | 期望 | 实测 | 退出码 |
+| --- | --- | --- | --- |
+| `npm test` | 67 文件 / 820 条全绿 | `Test Files 67 passed (67)`、`Tests 820 passed (820)` | 0 |
+| `npm run typecheck` | exit 0 | `tsc --noEmit` 无输出 | 0 |
+| `npm run lint` | exit 0 | `eslint .` 无输出 | 0 |
+| `npm run build` | exit 0（含 egress 扫描） | `✓ built in 455ms`；`[scan-egress] 网络 API 调用 0 处；远程 URL 字面量 7 处`、`[scan-egress] 通过：产物中未发现外发能力。` | 0 |
+
+四道门禁**串行**跑、均真跑到 exit 0；已知 flake `crypto/token-generator/Tool.test.tsx` 本次未命中。
 

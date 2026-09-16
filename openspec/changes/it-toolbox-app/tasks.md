@@ -120,13 +120,13 @@
 
 ## 10. JSON 视图优化（语法高亮与可折叠树）
 
-- [ ] 10.1 实现 `core/json/tree.ts`：token 流 → 不可变节点树（path / kind / key / raw / start / end / childCount / 折叠摘要），类型口径复用 `type-hints.ts`，并编写表驱动用例（嵌套推导、转义原文保真、空对象与空数组、超长数组、非法输入）
-- [ ] 10.2 补充 `core/json/tree.ts` 的大输入用例：节点数上限与超阈值降级策略（只展开第一层并给出提示），确认构建耗时可接受
-- [ ] 10.3 实现 `framework/ui/JsonCode.tsx`：只读 JSON 视图按 `scanJson` 的 token 流着色，行号与滚动外观对齐 `CodeArea`，无法解析时回退等宽纯文本，并编写用例（着色落点、复制文本不含标记、回退路径）
-- [ ] 10.4 `app/theme.css` 增加 `--json-*` 配色变量与 `.json-code` 样式：token 类别可区分、浅底对比度足够，且沿用既有调色板变量而非硬编码色值
-- [ ] 10.5 实现 `framework/ui/JsonTree.tsx`：节点逐个折叠（`aria-expanded`）、折叠态含元素个数摘要、全部展开与全部折叠、只渲染已展开路径，并编写用例（折叠交互、键盘可达、摘要文案、上限提示）
-- [ ] 10.6 从 `framework/ui/index.ts` 导出 `JsonCode` / `JsonTree` 及其 props 类型，并补充索引一致性校验
-- [ ] 10.7 接入 4 处只读 JSON 视图改用 `JsonCode`：JSON 美化输出、JSON 压缩输出、JWT 的 Header 与 Payload、YAML→JSON 输出
-- [ ] 10.8 JSON 美化工具增加「树形」视图（与源码、类型提示并列）：视图切换、折叠状态独立、空输入与非法输入不显示节点
-- [ ] 10.9 钉住不变量用例：同一份 JSON 的树形显示与源码显示逐字符一致（转义原样保留），且复制与下载仍给出完整原文
-- [ ] 10.10 按 spec 增量逐条核对覆盖表（树形视图 8 条 Scenario、只读高亮 4 条 Scenario），跑全量门禁 test / typecheck / lint / build（含 egress 扫描）
+- [x] 10.1 实现 `core/json/tree.ts`：token 流 → 不可变节点树（path / kind / key / raw / start / end / childCount / 折叠摘要），类型口径复用 `type-hints.ts`，并编写表驱动用例（嵌套推导、转义原文保真、空对象与空数组、超长数组、非法输入）
+- [x] 10.2 补充 `core/json/tree.ts` 的大输入用例：节点数上限与超阈值降级策略（只展开第一层并给出提示），确认构建耗时可接受
+- [x] 10.3 实现 `framework/ui/JsonCode.tsx`：只读 JSON 视图按 `scanJson` 的 token 流着色，行号与滚动外观对齐 `CodeArea`，无法解析时回退等宽纯文本，并编写用例（着色落点、复制文本不含标记、回退路径）
+- [x] 10.4 `app/theme.css` 增加 `--json-*` 配色变量与 `.json-code` 样式：token 类别可区分、浅底对比度足够，且沿用既有调色板变量而非硬编码色值
+- [x] 10.5 实现 `framework/ui/JsonTree.tsx`：节点逐个折叠（`aria-expanded`）、折叠态含元素个数摘要、全部展开与全部折叠、只渲染已展开路径，并编写用例（折叠交互、键盘可达、摘要文案、上限提示）
+- [x] 10.6 从 `framework/ui/index.ts` 导出 `JsonCode` / `JsonTree` 及其 props 类型，并补充索引一致性校验
+- [x] 10.7 接入 4 处只读 JSON 视图改用 `JsonCode`：JSON 美化输出、JSON 压缩输出、JWT 的 Header 与 Payload、YAML→JSON 输出
+- [x] 10.8 JSON 美化工具增加「树形」视图（与源码、类型提示并列）：视图切换、折叠状态独立、空输入与非法输入不显示节点
+- [x] 10.9 钉住不变量用例：同一份 JSON 的树形显示与源码显示逐字符一致（转义原样保留），且复制与下载仍给出完整原文
+- [x] 10.10 按 spec 增量逐条核对覆盖表（树形视图 8 条 Scenario、只读高亮 4 条 Scenario），跑全量门禁 test / typecheck / lint / build（含 egress 扫描）
