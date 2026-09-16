@@ -27,6 +27,17 @@ export function jsonToPhp(text: string, options: JsonToPhpOptions = {}): Result<
   return ok(`$data = ${emit(built.value, unit, '')};`)
 }
 
+/**
+ * ⚠️ 本骨架与 `json-to-js.ts:42-60` 的 `emit` **同构**：对象 / 数组分支的缩进推进与
+ * `,\n` 连接逻辑逐字一致，函数签名也相同，仅三处不同 —— 空容器字面量（`[]` vs `{}`）、
+ * 键写法（`"k" =>` vs `rawKey:`）、值写法（字符串重新编码 vs 复用 JSON 原文）。
+ * 结构或分隔符语义变更时**两处必须同步修改** —— 漏改任一都会造成两路输出风格分叉。
+ *
+ * 刻意不抽公共 emitter：当前仅两个消费者，不足以反推出 4 个钩子的抽象边界；且第三个
+ * 潜在消费者 XML 的形态本就不同（元素名净化、`<x/>` / `<x></x>` 两态、数组包裹），
+ * CSV 是扁平结构。待真的出现第三个「同形」骨架时，再按 rule of three 一并抽取
+ * （见 Task 7 的审查范围）。
+ */
 function emit(node: JsonNode, unit: string, indent: string): string {
   if (node.kind === 'object') {
     if (node.entries.length === 0) return '[]'
