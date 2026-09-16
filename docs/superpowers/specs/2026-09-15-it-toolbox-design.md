@@ -545,3 +545,33 @@ delta spec 的每个 Scenario 对应至少一个用例。这是测试覆盖率�
 | 单调性仅限会话内 | 跨进程不保证 ULID/v7 全局单调 | spec 已显式限定范围 |
 | 工具组件不做逐个渲染测试 | 工具层回归依赖人工冒烟 | 算法已在 Core 层被覆盖；渲染层为薄壳 |
 | RSA 生成期间无进度回调 | WebCrypto 不提供进度事件 | 不确定进度态 + 已耗时展示 + 禁用重复提交 |
+
+---
+
+## 12. Implementation Divergence（增量实现与本文档的偏差记录）
+
+本节由 comet 阶段 4（验证）补记。它记录的不是笔误，而是**本文档 §1–§11 定稿之后、由后续增量引入且未回填本文档的两组要求**，以及它们在实现里已经固化的设计决策。发现过程与影响范围见 `docs/superpowers/reports/2026-09-16-it-toolbox-app-verify.md`（W3）。
+
+### 12.1 差的是什么
+
+| 要求 | spec 落点 | 实现 | 引入时间与载体 |
+|---|---|---|---|
+| JSON 只读视图的语法高亮（4 Scenario） | `openspec/changes/it-toolbox-app/specs/tool-registry/spec.md:198-220` | `src/framework/ui/JsonCode.tsx` + 四处接入（json-format / json-minify / jwt-parser / yaml-to-json） | 2026-09-16 增量；载体 `openspec/changes/it-toolbox-app/tasks.md:118-129`（第 10 组）与 `.superpowers/sdd/2026-09-16-it-toolbox-json-view/` |
+| JSON 树形视图（8 Scenario） | `openspec/changes/it-toolbox-app/specs/dev-tools/spec.md:101-143` | `src/core/json/tree.ts` + `src/framework/ui/JsonTree.tsx` | 同上 |
+
+**未回填的原因（如实记录）**：这两组要求由 2026-09-16 的独立 SDD 增量承接，当时以「实施计划 + 执行记录」（`docs/superpowers/plans/2026-09-16-it-toolbox-json-view.md`）作为设计载体，没有回写本文档；§3.1 的模块清单里也一直没有 `core/json/tree.ts`。功能与设计决策本身都在代码与用例里被钉住了，缺的是「后来加工具的人从哪儿读到这条横切契约」。
+
+### 12.2 实际固化的设计决策（以本节为准）
+
+1. **只读 JSON 必须走框架层统一组件**：`JsonCode` 是唯一着色入口，四个只读视图（JSON 美化输出、JSON 压缩输出、JWT 的 Header 与 Payload、YAML→JSON 输出）都只 `import { JsonCode }`，工具层不得自带着色逻辑。
+2. **零新增运行时依赖**：着色数据复用 `core/json/scanner.ts` 的自研 token 流，渲染时把片段按原文拼回（不补填充字符）。这正是「高亮不改变文本」不变量的实现方式 —— 不引 shiki / prism / highlight.js（与 §7「明确拒绝」一致，也不给 §5 的离线四层留新的外发面）。
+3. **解析失败降级为纯文本**，不抛异常、不上色；JWT 的载荷解析失败由工具层走 `<pre>`，因此头部视图仍是第一个 `json-code`。
+4. **树形视图与类型提示同口径**：`JsonTree` 的类型标签复用 `core/json/type-hints.ts`（前序类型标签序列逐节点一致）。**已知例外**：重复键文档下 `type-hints` 经 `Object.keys` 只给一个节点、树按 token 给多个，「一一对应」不成立 —— `core/json/tree.test.ts` 的注释已把该用例限定在「无重复键的文档」，spec 未限定。
+5. **原文保真只覆盖「值」，键名走解码**：`core/json/tree.ts` 的值取 `token.raw` 原文切片（`\u0041` / `1e2` / `a\/b` 不被规范化），对象键名则经 `JSON.parse` 解码后展示并据此生成路径。
+6. **折叠重置的判据是「文档原文」**（`tree.root.raw`），而非默认折叠数组的身份 —— 否则改一次缩进就会把用户的手动折叠抹掉（该缺陷在 Task 8 复核时被实测证伪并修复）。
+7. **大输入的降级参数**：树默认只展开第一层、渲染行数设上限，超限如实提示「仅渲染前 N 行」；JSON 美化 >512KB 时先渲染「处理中」再延迟计算（与 §11 的已知取舍一致）。
+8. **树形视图不影响复制与下载**：复制 / 下载取的始终是格式化后的完整原文，不含树形的装饰标记。
+
+### 12.3 未在本节处理的相关发现
+
+`tool-registry` 的「无输入工具隐藏输入区」与「输入区高亮错误位置」两条 Scenario 存在**实现与 spec 字面不符**（前者：`ToolLayout` 标准形态始终渲染输入 Pane；后者：`CodeArea` 的 `errorLine` 只在只读分支生效，而唯一传参者 `json-diff` 是可编辑态）。这两条属待修 / 待改口径项，理由与建议见验证报告 §5 的 W1、W2，本节不预先裁定。
