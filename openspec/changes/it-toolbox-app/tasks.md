@@ -50,18 +50,18 @@
 
 ## 5. 加密类工具
 
-- [ ] 5.1 实现 `core/crypto/token.ts`：安全随机、字符集（字母数字/hex/base64/base64url/自定义）、长度、数量、前缀
+- [x] 5.1 实现 `core/crypto/token.ts`：安全随机、字符集（字母数字/hex/base64/base64url/自定义）、长度、数量、前缀
 - [x] 5.2 实现 `core/crypto/uuid.ts`：v1（随机 multicast 节点 ID）、v4、v7（时间有序）、格式选项
-- [ ] 5.3 实现 `core/crypto/ulid.ts`：Crockford Base32 编解码、时间戳解析、同毫秒单调递增
-- [ ] 5.4 实现 `core/crypto/hmac.ts`：SHA-1/256/384/512、密钥编码（UTF-8/hex/base64）、输出编码（hex/base64/base64url）
-- [ ] 5.5 实现 `core/crypto/rsa.ts`：密钥对生成、PEM 导出（PKCS#1 / PKCS#8 / SPKI / OpenSSH）
-- [ ] 5.6 编写上述 Core 的 Vitest 用例，覆盖 spec 中全部 Scenario（含非法输入分支）
-- [ ] 5.7 实现 Token 生成器工具（含字符集为空的校验提示）
+- [x] 5.3 实现 `core/crypto/ulid.ts`：Crockford Base32 编解码、时间戳解析、同毫秒单调递增
+- [x] 5.4 实现 `core/crypto/hmac.ts`：SHA-1/256/384/512、密钥编码（UTF-8/hex/base64）、输出编码（hex/base64/base64url）
+- [x] 5.5 实现 `core/crypto/rsa.ts`：密钥对生成、PEM 导出（PKCS#1 / PKCS#8 / SPKI / OpenSSH）
+- [x] 5.6 编写上述 Core 的 Vitest 用例，覆盖 spec 中全部 Scenario（含非法输入分支）
+- [x] 5.7 实现 Token 生成器工具（含字符集为空的校验提示）
 - [x] 5.8 实现 UUID 生成器工具（含 v1 节点 ID 为随机值的界面说明）
-- [ ] 5.9 实现 ULID 生成器工具（展示解码出的时间戳）
-- [ ] 5.10 实现 HMAC 生成器工具（含密钥为空与非法 hex 的提示）
-- [ ] 5.11 实现 RSA 密钥对生成器工具（生成中禁用重复提交、参数变更不自动重算、公钥私钥分别复制与导出）
-- [ ] 5.12 实现 `core/der.ts`（DER 最小写入器）与 `core/ssh-key.ts`（OpenSSH 公钥组装），并编写交叉验证用例：测试内独立 DER 读取器互校、`openssl rsa -check`（缺失则 skip）、`ssh-rsa` 与 JWK 的 n/e 比对
+- [x] 5.9 实现 ULID 生成器工具（展示解码出的时间戳）
+- [x] 5.10 实现 HMAC 生成器工具（含密钥为空与非法 hex 的提示）
+- [x] 5.11 实现 RSA 密钥对生成器工具（生成中禁用重复提交、参数变更不自动重算、公钥私钥分别复制与导出）
+- [x] 5.12 实现 `core/der.ts`（DER 最小写入器）与 `core/ssh-key.ts`（OpenSSH 公钥组装），并编写交叉验证用例：测试内独立 DER 读取器互校、`openssl rsa -check`（缺失则 skip）、`ssh-rsa` 与 JWK 的 n/e 比对
 
 ## 6. 转换器工具
 

@@ -87,6 +87,19 @@ function toBigInt(value: Uint8Array): bigint {
   return out
 }
 
+/**
+ * DER INTEGER 的规范性：正数且最高位为 1 时必须补 0x00（X.690 §8.3.2）。
+ *
+ * 补这条是因为 `toBigInt` 只做无符号累加 —— T11 变异检验实测：把 `der.ts` 的
+ * `needsPad` 恒置为 false 时，本文件的互校用例**仍然全绿**。读取器必须比写入器更严，
+ * 否则「两次都错成一样」。加断言后该变异会同时打挂这里（9 个参数里只要有一个
+ * 最高位为 1 即失败，即约 99.8% 的调用里都会失败）。
+ */
+function expectCanonicalPositiveInteger(value: Uint8Array): void {
+  expect(value.length).toBeGreaterThan(0)
+  expect(value[0]! & 0x80).toBe(0)
+}
+
 // 返回类型必须写成 Uint8Array<ArrayBuffer>（而不是默认的 Uint8Array<ArrayBufferLike>）：
 // 返回的字节要直接喂给 WebCrypto 的 BufferSource，TS 5.7+ 的泛型 Uint8Array 在这点上不兼容。
 // 这里改类型而不是再复制一份：本函数返回的本来就是新建的 ArrayBuffer 支撑数组。
@@ -195,6 +208,9 @@ describe('generateRsaKeyPair', () => {
 
     const children = readSequenceChildren(pemToDer(pair.privateKey))
     expect(children).toHaveLength(9)
+
+    // 先钉住编码规范性（正数补零），再验数学恒等式：前者是「读取器比写入器更严」的一半
+    children.forEach((child) => expectCanonicalPositiveInteger(child.value))
 
     const [version, n, e, d, p, q, dp, dq, qi] = children.map((child) => toBigInt(child.value))
 

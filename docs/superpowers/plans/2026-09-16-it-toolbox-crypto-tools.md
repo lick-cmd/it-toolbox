@@ -3904,6 +3904,59 @@ git commit -m "chore(openspec): 勾选 tasks.md 第 5 组加密工具条目，�
 - 剩余未完成条目属计划②-2 / ②-3 / ②-4（转换器 / Web / 图片与开发）"
 ```
 
+#### T11 执行记录（2026-09-16）
+
+**Step 1 逐条核对结果**：`grep -n "^#### Scenario:"` 实测 **29** 条，与下表行数相等。⚠️ Requirement 实为 **5 个**（Token / UUID / ULID / HMAC / RSA），计划原文「4 个 Requirement 合计」有误；UUID 的 7 条属计划① 交付范围，为便于逐条核对一并列出。
+
+| Requirement | Scenario | 覆盖用例（文件 :: 用例名） |
+|---|---|---|
+| Token 生成器 | 按默认参数生成 | `core/crypto/token.test.ts` :: 按默认参数生成一个 Token，长度与字符集均符合预期；`tools/crypto/token-generator/Tool.test.tsx` :: 首次渲染按默认参数生成一个 32 位 Token |
+| Token 生成器 | 自定义长度与字符集 | `core/crypto/token.test.ts` :: 自定义长度与字符集：长度 64、十六进制；`tools/crypto/token-generator/Tool.test.tsx` :: 长度改为 64、字符集改为十六进制后输出 64 位十六进制 |
+| Token 生成器 | 自定义字符集校验 | `core/crypto/token.test.ts` :: 自定义字符集为空（含全空白）时抛 RangeError ＋ :: 自定义字符集为空时抛 RangeError（供工具层捕获后提示）；`tools/crypto/token-generator/Tool.test.tsx` :: 字符集选自定义但内容为空时提示不可为空且不输出结果 |
+| Token 生成器 | 批量生成 | `core/crypto/token.test.ts` :: 批量生成 5 个且互不相同；`tools/crypto/token-generator/Tool.test.tsx` :: 数量改为 5 时输出 5 行且互不相同 |
+| Token 生成器 | 带前缀生成 | `core/crypto/token.test.ts` :: 前缀加在随机段之前，且不计入 length；`tools/crypto/token-generator/Tool.test.tsx` :: 前缀 sk_ 会出现在每一行开头，且计入总数上限 |
+| Token 生成器 | 使用安全随机源 | `core/crypto/token.test.ts` :: 随机值来自 crypto.getRandomValues，不使用 Math.random，且随机字节决定输出 |
+| UUID 生成器 | 生成 v4 | `core/crypto/uuid.test.ts` :: v%i 符合 UUID 格式且变体位正确（`it.each` 的 v4 实例，`UUID_PATTERN` 已含 `[89ab]` 变体位）；`tools/crypto/uuid-generator/Tool.test.tsx` :: 默认生成 10 条 v4（小写、带连字符），并给出复制与导出入口 |
+| UUID 生成器 | 生成 v7 | `core/crypto/uuid.test.ts` :: 编码的时间戳接近当前时刻 ＋ :: 时间戳部分为 48 位大端编码（版本位由上面 `it.each` 那条覆盖） |
+| UUID 生成器 | 生成 v1 | `core/crypto/uuid.test.ts` :: 解码出的时间戳接近当前时刻（版本位同上由 `it.each` 覆盖） |
+| UUID 生成器 | v1 节点 ID 隐私 | `core/crypto/uuid.test.ts` :: 节点 ID 首字节最低位为 1（随机 multicast 标志）；`tools/crypto/uuid-generator/Tool.test.tsx` :: v1 说明文案里不出现字面量星号（同条断言界面含「会话级随机值」） |
+| UUID 生成器 | v7 时间有序 | `core/crypto/uuid.test.ts` :: 同一毫秒内批量生成仍严格字典序递增 |
+| UUID 生成器 | 格式选项 | `core/crypto/uuid.test.ts` :: 去掉连字符 ＋ :: 大写输出；`tools/crypto/uuid-generator/Tool.test.tsx` :: 勾选大写只改变大小写，不重新生成 ＋ :: 取消连字符只去掉分隔符，不重新生成 |
+| UUID 生成器 | 批量生成 | `core/crypto/uuid.test.ts` :: 按数量生成且互不相同；`tools/crypto/uuid-generator/Tool.test.tsx` :: 数量改变后条数与状态文案同步 |
+| ULID 生成器 | 生成合法 ULID | `core/crypto/ulid.test.ts` :: 生成 26 个字符且全部属于 Crockford 字符集；`tools/crypto/ulid-generator/Tool.test.tsx` :: 首次渲染生成 10 条 26 位 ULID |
+| ULID 生成器 | 时间戳可解析 | `core/crypto/ulid.test.ts` :: 内嵌时间戳与当前时间偏差在 2 秒以内；`tools/crypto/ulid-generator/Tool.test.tsx` :: 状态行展示解码出的时间戳，且与当前时间偏差在 2 秒内 |
+| ULID 生成器 | 单调递增 | `core/crypto/ulid.test.ts` :: 同一毫秒内连续生成 200 个，字典序严格递增；`tools/crypto/ulid-generator/Tool.test.tsx` :: 同一毫秒内的批量结果字典序严格递增 |
+| ULID 生成器 | 批量生成 | `core/crypto/ulid.test.ts` :: 批量 20 个互不相同；`tools/crypto/ulid-generator/Tool.test.tsx` :: 数量改为 20 时输出 20 行且互不相同 |
+| HMAC 生成器 | 默认算法计算 | `core/crypto/hmac.test.ts` :: RFC 4231 向量：HMAC-SHA-256 的十六进制输出与标准值一致；`tools/crypto/hmac-generator/Tool.test.tsx` :: 填入密钥与消息后产出 64 位十六进制摘要 |
+| HMAC 生成器 | 密钥以十六进制给出 | `core/crypto/hmac.test.ts` :: 十六进制密钥 6b6579 与 UTF-8 密钥 key 结果一致 |
+| HMAC 生成器 | 切换算法改变结果 | `core/crypto/hmac.test.ts` :: 切换算法改变摘要长度：SHA-256 → 64 字符，SHA-512 → 128 字符；`tools/crypto/hmac-generator/Tool.test.tsx` :: 切换到 SHA-512 后摘要变长到 128 位 |
+| HMAC 生成器 | 输出格式切换 | `core/crypto/hmac.test.ts` :: 输出格式切换：base64 解码后的字节与 hex 输出逐字节一致；`tools/crypto/hmac-generator/Tool.test.tsx` :: 输出编码切换后为同一摘要的不同表示，且可相互还原 |
+| HMAC 生成器 | 密钥为空 | `core/crypto/hmac.test.ts` :: 密钥为空时返回错误且不输出结果；`tools/crypto/hmac-generator/Tool.test.tsx` :: 未填密钥时先呈现空态，随后提示密钥不可为空且无输出 |
+| HMAC 生成器 | 非法十六进制密钥 | `core/crypto/hmac.test.ts` :: 非法 hex 的错误偏移指向首个非法字符，而非恒为 0；`tools/crypto/hmac-generator/Tool.test.tsx` :: 密钥编码选十六进制但内容非法时提示密钥格式非法并清空旧摘要 |
+| RSA 密钥对生成器 | 生成 2048 位密钥对 | `core/crypto/rsa.test.ts` :: 默认导出 SPKI 公钥与 PKCS#8 私钥，均为合法 PEM；`tools/crypto/rsa-key-generator/Tool.test.tsx` :: 点击生成后同时展示公钥与私钥 |
+| RSA 密钥对生成器 | 私钥格式 | `core/crypto/rsa.test.ts` :: 私钥格式为 PKCS#1 时用 RSA PRIVATE KEY 标签 ＋ :: 默认导出 SPKI 公钥与 PKCS#8 私钥；`tools/crypto/rsa-key-generator/Tool.test.tsx` :: 重新点击生成后应用新参数并刷新结果（切 PKCS#8 后断言 `-----BEGIN PRIVATE KEY-----`） |
+| RSA 密钥对生成器 | 公钥格式 | `core/crypto/rsa.test.ts` :: 公钥格式为 PKCS#1 / OpenSSH 时用各自的表示；`tools/crypto/rsa-key-generator/Tool.test.tsx` :: 公钥格式选 OpenSSH 时输出单行 ssh-rsa |
+| RSA 密钥对生成器 | 生成期间的状态 | `tools/crypto/rsa-key-generator/Tool.test.tsx` :: 生成中按钮禁用且给出进行中状态，完成后恢复可用 |
+| RSA 密钥对生成器 | 公钥私钥相互匹配 | `core/crypto/rsa.test.ts` :: 私钥与公钥属于同一密钥对（签名 / 验签往返）＋ :: 独立读取器解析 PKCS#1 私钥后，CRT 参数满足数学恒等式 ＋ :: ssh-rsa 行里的 n 与 e 与 PKCS#1 私钥里的模数、指数一致 |
+| RSA 密钥对生成器 | 参数变更不自动重算 | `tools/crypto/rsa-key-generator/Tool.test.tsx` :: 修改参数不自动重算：结果保留，状态行提示参数已变更 ＋ :: 首次渲染是空态，不自动生成 |
+
+**Step 2 变异检验结果**（三处，各一条命令，落一处 / 跑一处 / 还原一处）：
+
+| # | 变异 | 实测失败用例 | 判定 |
+|---|---|---|---|
+| A | `core/crypto/token.ts` 自定义字符集不去重（`[...new Set([...custom])]` → `[...custom]`） | `token.test.ts` :: 自定义字符集去除重复字符 ＋ :: 自定义字符集去重后不足 2 个字符时抛 RangeError | ✅ 含预期用例 |
+| B | `core/der.ts` `derInteger` 的 `needsPad` 恒 `false` | `der.test.ts` :: 最高位为 1 时补一个 0x00（正数语义）；`rsa.test.ts` :: 独立读取器解析 PKCS#1 私钥后，CRT 参数满足数学恒等式 | ✅ 含预期两条（首跑只挂前者，见下） |
+| C | `core/crypto/ulid.ts` 同毫秒不再递增随机段（删掉 `incrementRandom` 分支） | `ulid.test.ts` :: 同一毫秒内连续生成 200 个，字典序严格递增 ＋ :: 随机段溢出时把时间戳 +1ms，不产生重复或倒退 | ✅ 含预期用例 |
+
+- **B 首跑只挂了 `der.test.ts` 那条**：根因是 `rsa.test.ts` 互校读取器的 `toBigInt` 只做无符号累加 —— 漏补 `0x00` 在**读取侧不可见**（两遍读取「错成一样」，正是该文件注释警告的反模式）。按模板「发现伪测试就改断言」，已补 `expectCanonicalPositiveInteger`（断言每个 INTEGER 内容首字节最高位为 0，即 X.690 §8.3.2 的正数补零规范），复跑后两条预期用例**同时**失败。注：该缺陷在首跑时也未被漏网 —— `der.test.ts` 已独立钉住同一编码规范。
+- 三处变异均用「备份 → 落变异 → 单独跑目标文件 → 核对失败**用例名** → 还原备份 → `git diff --stat` 确认无残留」的形态，未使用 `git checkout`（其中 A 首版 sed 顺带引入了逗号拼接，已用干净版本重跑，两次都含预期用例名）。
+
+**Step 3 全量门禁实测**：`test=0 tc=0 lint=0 egress=0`，**62 个测试文件 / 761 个用例**。
+
+计划预期为 36 文件 / 401 用例，差异原因（**以实测为准，未改计划里的数字**）：① 并行工作流 ②-2 / ②-3 / ②-4 的工具已落地并计入全量门禁；② 本计划各任务评审回补的用例。本计划范围的回归集为 **37 文件 / 415 用例**（自 T7 起逐任务记录在 `progress.md`，与计划预期的 36 / 401 差 1 文件 / 14 用例）。
+
+**Step 4 勾选结果**：`grep -c "^- \[ \] 5\." = 0`，`grep -c "^- \[x\] 5\." = 12`。
+
 ---
 
 ## 收尾提示（给执行者）
