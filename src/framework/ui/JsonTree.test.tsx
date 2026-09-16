@@ -63,6 +63,24 @@ describe('JsonTree', () => {
     expect(screen.getByText('{}')).toBeTruthy()
   })
 
+  // S2：`\u0041` 在 json-format 的用例里有钉子，`\/` 此前没有 —— 三个可改写写法应当齐平
+  it('标量里的 `\\/` 按原文显示，不被改写为 `/`', () => {
+    render(<JsonTree tree={treeOf('{"p":"a\\/b"}')} />)
+
+    const rows = rowTexts().join('\n')
+    expect(rows).toContain('a\\/b')
+    expect(rows).not.toContain('a/b')
+  })
+
+  // S3：键名走解码、值走原文切片，这条边界此前在 spec 与用例里都没写
+  it('键名按解码后的名称展示（值才做原文保真）', () => {
+    render(<JsonTree tree={treeOf('{"\\u0041":1}')} />)
+
+    const rows = rowTexts().join('\n')
+    expect(rows).toContain('A:')
+    expect(rows).not.toContain('\\u0041')
+  })
+
   it('重复键如实渲染成两行，不因 path 相同而少画一行', () => {
     // 树层有意让重复键各自成节点（path 相同），界面必须照画两行：
     // 少画一行就等于替用户删了一个他源码里写着的数据。

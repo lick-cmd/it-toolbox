@@ -30,6 +30,17 @@ describe('JsonCode', () => {
     expect(container.textContent).not.toContain('"A"')
   })
 
+  // S2：`\u0041` 与 `1e2` 都有钉子，唯独 `\/` 只在 Core 的 raw 层被测过，
+  // 两个视图的渲染断言都没覆盖 —— 而它同样是「可被等价改写」的写法之一
+  it('`\\/` 保留原文，不显示为等价写法', () => {
+    const value = '{"p":"a\\/b"}'
+    const { container } = render(<JsonCode value={value} />)
+
+    expect(container.textContent).toContain('a\\/b')
+    expect(container.textContent).not.toContain('a/b')
+    expect(linesOf(container).join('\n')).toBe(value)
+  })
+
   it('多行输入按行渲染且带行号', () => {
     const value = '{\n  "a": 1\n}'
     const { container } = render(<JsonCode value={value} />)

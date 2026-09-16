@@ -190,6 +190,31 @@ describe('App', () => {
     expect(screen.getByRole('dialog', { name: '搜索工具' })).toBeDefined()
   })
 
+  // S1：原用例只钉「面板能开关」，「快捷键不与输入框冲突」这件事从未被断言过 ——
+  // 现在钉住工具输入框的内容在全局快捷键前后逐字符不变（含不得混入杂字符）。
+  it('全局快捷键在工具输入框聚焦时不改动其内容', async () => {
+    render(<App />)
+    await userEvent.click(screen.getByRole('button', { name: 'JSON 美化' }))
+
+    const textarea = (await screen.findByRole('textbox', {
+      name: 'JSON 源码',
+    })) as HTMLTextAreaElement
+    // 用 fireEvent.change 而非 userEvent.type：userEvent 的键盘语法把 `{` 当描述符，
+    // 输入 JSON 需要转义，反而绕；本仓对 textarea 一律用 change（见 json-diff 的 setSide）
+    fireEvent.change(textarea, { target: { value: '{"a":1}' } })
+    expect(textarea.value).toBe('{"a":1}')
+
+    await userEvent.keyboard('{Meta>}k{/Meta}')
+    expect(screen.getByRole('dialog', { name: '搜索工具' })).toBeDefined()
+
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    expect(
+      (screen.getByRole('textbox', { name: 'JSON 源码' }) as HTMLTextAreaElement).value,
+    ).toBe('{"a":1}')
+  })
+
   // 补这一条是为了不依赖 CommandPalette.test 里的合成样本：走真实注册表 + 真实 meta.ts 关键词
   it('真实注册表下按中文关键词命中工具', async () => {
     render(<App />)

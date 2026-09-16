@@ -77,6 +77,24 @@ describe('UUID 生成器工具', () => {
     expect(after).toEqual(before.map((line) => line.replaceAll('-', '')))
   })
 
+  // 两个开关各自单测都过，组合态仍可能漏（S1）：这里钉「同时关连字符 + 开大写」
+  it('关闭连字符与开启大写可组合，且仍不重新生成', async () => {
+    render(<UuidGeneratorTool />)
+    const before = lines()
+
+    await userEvent.click(checkbox('连字符'))
+    await userEvent.click(checkbox('大写'))
+
+    const after = lines()
+    expect(after).toHaveLength(before.length)
+    expect(after.every((line) => !line.includes('-'))).toBe(true)
+    expect(after.every((line) => line === line.toUpperCase())).toBe(true)
+    // 逐字符回到规范形式：既没被重新生成，也没被两个开关互相覆盖
+    expect(after.map((line) => line.toLowerCase())).toEqual(
+      before.map((line) => line.replaceAll('-', '')),
+    )
+  })
+
   it('切换版本会重新生成，且版本位随之改变', async () => {
     render(<UuidGeneratorTool />)
     const before = lines()

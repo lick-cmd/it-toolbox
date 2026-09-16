@@ -112,9 +112,14 @@ describe('Token 生成器', () => {
 
     await user.selectOptions(screen.getByLabelText('字符集'), 'hex')
     // 写入去抖 200ms：轮询到真的落盘，而不是死等固定时长。
-    await vi.waitFor(() => {
-      expect(localStorage.length).toBeGreaterThan(0)
-    })
+    // 显式 3s timeout（S6）：默认 1s 只剩 800ms 余量，与 typecheck/lint 并行时会假红；
+    // uuid-generator 的同款用例早已传 `{ timeout: 3000 }`。
+    await vi.waitFor(
+      () => {
+        expect(localStorage.length).toBeGreaterThan(0)
+      },
+      { timeout: 3000 },
+    )
     // 「按工具 id 持久化」是这条用例的意图之一：同 key 往返在「换成任意常量 id」时也成立。
     // 注意 storage.ts 的布局是「单一 localStorage 键 + JSON 映射」，工具 id 是**映射里的键**
     // 而不是 localStorage 键名，故只能在落盘内容里找 id（不绑定 storage.ts 的完整键格式）。

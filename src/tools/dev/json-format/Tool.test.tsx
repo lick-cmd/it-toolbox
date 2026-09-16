@@ -268,6 +268,9 @@ describe('树形视图', () => {
     setInput('{"a":}')
     await user.click(screen.getByRole('button', { name: '树形' }))
 
+    // 先钉住「确实切到了树形视图」：否则「没有节点」可能只是因为还停在格式化视图，
+    // 删掉整个树分支也照样绿（W6 —— 这是原用例真正的咬合力缺口）。
+    expect(screen.getByRole('button', { name: '树形' }).getAttribute('aria-pressed')).toBe('true')
     expect(document.querySelector('[data-testid="json-tree"]')).toBeNull()
     expect(screen.getByRole('alert')).toBeTruthy() // ErrorNote
   })
@@ -277,6 +280,9 @@ describe('树形视图', () => {
     render(<JsonFormatTool />)
 
     await user.click(screen.getByRole('button', { name: '树形' }))
+
+    expect(screen.getByRole('button', { name: '树形' }).getAttribute('aria-pressed')).toBe('true')
+    expect(document.querySelector('[data-testid="json-tree"]')).toBeNull()
     expect(screen.getByText('尚未输入')).toBeTruthy()
   })
 

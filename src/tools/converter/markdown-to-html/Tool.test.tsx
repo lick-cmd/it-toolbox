@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import MarkdownToHtmlTool from './Tool'
 
 const preview = () => screen.getByTestId('md-preview')
@@ -12,6 +12,11 @@ const setInput = (value: string) => {
 
 beforeEach(() => {
   localStorage.clear()
+})
+
+afterEach(() => {
+  // `vi.restoreAllMocks()` 不撤销 `vi.stubGlobal`，必须显式撤销（本仓先例 clipboard.test.ts）
+  vi.unstubAllGlobals()
 })
 
 describe('Markdown 转 HTML 工具', () => {
@@ -67,5 +72,23 @@ describe('Markdown 转 HTML 工具', () => {
   it('空输入时展示空态', () => {
     render(<MarkdownToHtmlTool />)
     expect(screen.getByText('尚未输入')).toBeDefined()
+  })
+
+  // S1：原用例只断言「复制 HTML 源码」按钮存在，从未点过它、也没看过剪贴板内容
+  it('复制 HTML 源码把源码写入剪贴板并给出反馈', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    // jsdom 的 navigator.clipboard 是 getter-only，故用 stubGlobal（先例 clipboard.test.ts:17-19）
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+
+    render(<MarkdownToHtmlTool />)
+    setInput('# 标题')
+    await userEvent.click(screen.getByRole('button', { name: '源码' }))
+    await userEvent.click(screen.getByRole('button', { name: '复制 HTML 源码' }))
+
+    await vi.waitFor(() => {
+      // markdown-it 的渲染结果以换行结束，源码视图与复制内容都保留它
+      expect(writeText).toHaveBeenCalledWith('<h1>标题</h1>\n')
+    })
+    expect(await screen.findByText('已复制')).toBeDefined()
   })
 })

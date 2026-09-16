@@ -1986,11 +1986,11 @@ git commit -m "docs(tasks): 第 10 组 JSON 视图优化完成（10.1–10.10）
 | 逐个折叠子项 | `折叠某个子项后其子孙消失，并显示含元素个数的摘要` | `src/framework/ui/JsonTree.test.tsx:26` | 既有用例，复跑确认。它点「折叠 $.a」后同时断言三件事：行数 3（子项收起）、`{…} 2 键` 摘要出现、开关 `aria-expanded=false`；同级 `$.d` 仍在（父/同级不受影响）。摘要素材另由核心 `tree.test.ts:56`「折叠摘要给出元素个数，空容器如实显示」钉住（`{…} 2 键` / `[…] 3 项`），工具内可用性由 `json-format/Tool.test.tsx:241`「切到树形后展示可折叠节点，折叠后显示摘要」钉住。 |
 | 折叠状态按节点独立 | `折叠状态按节点独立，互不影响` | `src/framework/ui/JsonTree.test.tsx:37` | 既有用例，复跑确认。折叠 `$.a` → 折叠 `$.c` → 展开 `$.a`，断言 `$.c` 仍 `aria-expanded=false` 而 `$.a` 为 `true`——「展开另一个节点不动已折叠的节点」正是这条主张。核心侧由 `tree.test.ts:261`「折叠某节点后其子孙全部不可见，且只影响该节点」钉住折叠语义。 |
 | 类型标签口径一致 | `类型口径与 collectTypeHints 逐节点一致`；`树的前序类型标签序列与 collectTypeHints 完全一致` | `src/core/json/tree.test.ts:189`；`src/core/json/tree.test.ts:314` | 既有用例，复跑确认。前者对整棵树逐节点比对 `collectTypeHints` 的 `path → type/label`（数量相等且一一对应），后者比对前序标签序列整体相等——「两个视图类型标签一一对应」的直接钉子。界面确已画出标签由 `JsonTree.test.tsx:20`「默认展开全部节点并展示类型标签」钉住。 |
-| 标量保留原文转义 | `标量取原文切片，不做规范化`；`树形显示的标量与源码原文逐字符一致（转义不被规范化）` | `src/core/json/tree.test.ts:25`；`src/tools/dev/json-format/Tool.test.tsx:299` | 既有用例，复跑确认。核心用例断言 `\u0041` / `1e2` / `a\/b` 的 `raw` 逐字保持原文；集成用例在真工具里先看源码视图再看树视图，断言树里仍是 `"\u0041"`、`1e2` 且 `queryByText('"A"')` 为 `null`——正是「不得显示为规范化后的等价写法」。 |
+| 标量保留原文转义 | `标量取原文切片，不做规范化`；`树形显示的标量与源码原文逐字符一致（转义不被规范化）` | `src/core/json/tree.test.ts:25`；`src/tools/dev/json-format/Tool.test.tsx:305` | 既有用例，复跑确认。核心用例断言 `\u0041` / `1e2` / `a\/b` 的 `raw` 逐字保持原文；集成用例在真工具里先看源码视图再看树视图，断言树里仍是 `"\u0041"`、`1e2` 且 `queryByText('"A"')` 为 `null`——正是「不得显示为规范化后的等价写法」。 |
 | 全部展开与全部折叠 | `全部折叠后除根以外全部收起，全部展开后恢复` | `src/framework/ui/JsonTree.test.tsx:49` | 既有用例，复跑确认。点「全部折叠」后行数 3（除根外容器收起）、点「全部展开」后行数 4（恢复全展开）。折叠路径集合由核心 `tree.test.ts:333`「给出除根以外全部容器路径，供「全部折叠」使用」钉住（根不折）。 |
 | 大体积输入 | `大输入默认只展开第一层，并如实提示渲染上限` | `src/framework/ui/JsonTree.test.tsx:74` | 既有用例，复跑确认。2010 个单元素数组 + `maxRows={20}`，断言出现 `仅渲染前 20 行` 提示、只画 20 行、折叠子数组显示 `[…] 1 项`——「只渲染已展开路径 + 超上限明确提示 + 不无响应」的三点合一。核心侧由 `tree.test.ts:292`「大输入默认只展开第一层」与 `tree.test.ts:282`「超过行数上限时截断并如实标记」钉住。 |
-| 非法输入与空输入 | `非法输入时树形视图显示错误而非节点`；`空输入时树形视图显示空态` | `src/tools/dev/json-format/Tool.test.tsx:264`；`src/tools/dev/json-format/Tool.test.tsx:275` | 既有用例，复跑确认。非法输入切树形后 `[data-testid="json-tree"]` 为 `null` 且 `role=alert` 存在；空输入切树形显示「尚未输入」。「不展示任何节点」由这两条分别钉住（**注意**：`json-tree === null` 本身不咬人，真正咬人的是 `alert` 断言，见下方非阻塞观察）。 |
-| 复制与下载不受视图影响 | `复制与下载给的是完整原文，不含树形的装饰标记`；`树形视图同样给出复制与下载入口` | `src/tools/dev/json-format/Tool.test.tsx:321`；`src/tools/dev/json-format/Tool.test.tsx:253` | 既有用例，复跑确认。前者切树形后点「复制」，断言 `navigator.clipboard.writeText` 收到的是 `'{\n  "a": {\n    "b": 1\n  }\n}'`（完整格式化原文，无 `▾`/路径/类型标签等装饰）；后者断言树形视图下「复制」「下载」入口仍在。**这条剪贴板用例即下方例外 4（`vi.stubGlobal` 未还原）所在处**，本文件其余 22 条不点「复制」，当前无污染。 |
+| 非法输入与空输入 | `非法输入时树形视图显示错误而非节点`；`空输入时树形视图显示空态` | `src/tools/dev/json-format/Tool.test.tsx:264`；`src/tools/dev/json-format/Tool.test.tsx:278` | 既有用例，复跑确认。非法输入切树形后 `[data-testid="json-tree"]` 为 `null` 且 `role=alert` 存在；空输入切树形显示「尚未输入」。「不展示任何节点」由这两条分别钉住（**注意**：`json-tree === null` 本身不咬人，真正咬人的是 `alert` 断言，见下方非阻塞观察）。 |
+| 复制与下载不受视图影响 | `复制与下载给的是完整原文，不含树形的装饰标记`；`树形视图同样给出复制与下载入口` | `src/tools/dev/json-format/Tool.test.tsx:327`；`src/tools/dev/json-format/Tool.test.tsx:253` | 既有用例，复跑确认。前者切树形后点「复制」，断言 `navigator.clipboard.writeText` 收到的是 `'{\n  "a": {\n    "b": 1\n  }\n}'`（完整格式化原文，无 `▾`/路径/类型标签等装饰）；后者断言树形视图下「复制」「下载」入口仍在。**这条剪贴板用例即下方例外 4（`vi.stubGlobal` 未还原）所在处**，本文件其余 23 条不点「复制」，当前无污染。 |
 
 #### `tool-registry`：「JSON 只读视图的语法高亮」（4 条）
 
@@ -2020,7 +2020,7 @@ git commit -m "docs(tasks): 第 10 组 JSON 视图优化完成（10.1–10.10）
 1. `tool-registry` 的「离线可用」：环境构造不出来，由「零新增运行时依赖」+ `npm run build` 的 `scripts/scan-egress.mjs` 产物扫描共同保证，真实断网留 9.3 实机冒烟。
 2. 树形视图下「树形视图」这串字出现两次（输出区标题 + `JsonTree` 的 `sr-only` label）：文案重复无害，未处理；**后续写用例别用 `getByText('树形视图')`**（会命中两个元素）。
 3. `JsonTree` 在**切走视图再切回**时会因组件卸载丢失手动折叠：这不是缺陷（组件已卸载），复核明确「不升级」；已修的是「文档没变、只是重建」那条（`fix(ui)` 提交 `ec78d21`）。
-4. `json-format/Tool.test.tsx` 末尾那条剪贴板用例用 `vi.stubGlobal('navigator', …)` 且**未**在该文件内还原（jsdom 30 的 `navigator.clipboard` 是 getter-only，`Object.assign` 会抛 `TypeError: Cannot set property clipboard…`，故改用仓库先例 `src/framework/clipboard.test.ts:17-19`）。当前无污染（该 describe 在文件末尾，其余 22 条都不点「复制」）；**日后若在其后追加用例，需补 `afterEach(() => vi.unstubAllGlobals())`**。
+4. `json-format/Tool.test.tsx` 末尾那条剪贴板用例用 `vi.stubGlobal('navigator', …)` 且**未**在该文件内还原（jsdom 30 的 `navigator.clipboard` 是 getter-only，`Object.assign` 会抛 `TypeError: Cannot set property clipboard…`，故改用仓库先例 `src/framework/clipboard.test.ts:17-19`）。当前无污染（该 describe 在文件末尾，其余 23 条都不点「复制」）；**日后若在其后追加用例，需补 `afterEach(() => vi.unstubAllGlobals())`**。
 
 ### 两条非阻塞观察（reviewer-task-8 提出）
 
