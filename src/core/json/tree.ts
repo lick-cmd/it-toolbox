@@ -242,3 +242,48 @@ function containerPathsFromDepth(node: JsonTreeNode, fromDepth: number): string[
   visit(node)
   return paths
 }
+
+export interface TreeRow {
+  node: JsonTreeNode
+  /** 该节点是否可以折叠（非空容器） */
+  expandable: boolean
+  /** 当前是否处于展开态；不可折叠的节点恒为 false */
+  expanded: boolean
+}
+
+/**
+ * 按折叠状态算出要渲染的行。
+ *
+ * 只遍历展开路径是树形视图能扛住大输入的原因：折叠节点的子孙根本不进入这次
+ * 遍历，也就不会产生 DOM。超过 `maxRows` 时停下并如实标记 `truncated` ——
+ * 界面必须把「还有内容没显示」讲出来。
+ */
+export function visibleRows(
+  tree: JsonTreeModel,
+  collapsed: ReadonlySet<string>,
+  maxRows: number = TREE_MAX_VISIBLE_ROWS,
+): { rows: TreeRow[]; truncated: boolean } {
+  const rows: TreeRow[] = []
+  let truncated = false
+
+  const visit = (node: JsonTreeNode): void => {
+    if (rows.length >= maxRows) {
+      truncated = true
+      return
+    }
+    const expandable = isContainer(node)
+    const expanded = expandable && !collapsed.has(node.path)
+    rows.push({ node, expandable, expanded })
+    if (expanded) {
+      for (const child of node.children) visit(child)
+    }
+  }
+
+  visit(tree.root)
+  return { rows, truncated }
+}
+
+/** 「全部折叠」：除根以外全部容器（根留着，否则界面只剩一行 `$`） */
+export function collapseAllPaths(tree: JsonTreeModel): string[] {
+  return containerPathsFromDepth(tree.root, 1)
+}

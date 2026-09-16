@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { buildJsonTree, keyText, valueText, type JsonTreeNode } from './tree'
+import {
+  TREE_AUTO_COLLAPSE_NODES,
+  buildJsonTree,
+  collapseAllPaths,
+  keyText,
+  valueText,
+  visibleRows,
+  type JsonTreeNode,
+} from './tree'
 import { parseJson } from './parse'
 import { collectTypeHints, jsonChildPath } from './type-hints'
 
@@ -226,5 +234,107 @@ describe('keyText / valueText', () => {
     const inner = nodeAt(built.value.root, '$.a')
     expect(inner === null ? '' : valueText(inner, true)).toBe('{')
     expect(inner === null ? '' : valueText(inner, false)).toBe('{…} 1 键')
+  })
+})
+
+/** 造一个指定节点数的数组：n 个元素 → n + 1 个节点 */
+function arrayOf(count: number): string {
+  return `[${Array.from({ length: count }, (_, index) => index).join(',')}]`
+}
+
+describe('visibleRows', () => {
+  it('默认全部展开时按前序给出每一行', () => {
+    const built = buildJsonTree('{"a":[1,2]}')
+    expect(built.ok).toBe(true)
+    if (!built.ok) return
+
+    const { rows, truncated } = visibleRows(built.value, new Set())
+    expect(rows.map((row) => row.node.path)).toEqual([
+      '$',
+      '$.a',
+      '$.a[0]',
+      '$.a[1]',
+    ])
+    expect(truncated).toBe(false)
+  })
+
+  it('折叠某节点后其子孙全部不可见，且只影响该节点', () => {
+    const built = buildJsonTree('{"a":{"x":1},"b":2}')
+    expect(built.ok).toBe(true)
+    if (!built.ok) return
+
+    const { rows } = visibleRows(built.value, new Set(['$.a']))
+    expect(rows.map((row) => row.node.path)).toEqual(['$', '$.a', '$.b'])
+    expect(rows.find((row) => row.node.path === '$.a')?.expanded).toBe(false)
+  })
+
+  it('可折叠性与展开状态分开表达', () => {
+    const built = buildJsonTree('{"o":{"x":1},"e":{},"s":"v"}')
+    expect(built.ok).toBe(true)
+    if (!built.ok) return
+
+    const byPath = new Map(visibleRows(built.value, new Set()).rows.map((row) => [row.node.path, row]))
+    expect(byPath.get('$.o')?.expandable).toBe(true)
+    expect(byPath.get('$.e')?.expandable).toBe(false) // 空对象没有可折叠内容
+    expect(byPath.get('$.s')?.expandable).toBe(false)
+  })
+
+  it('超过行数上限时截断并如实标记', () => {
+    const built = buildJsonTree(arrayOf(50))
+    expect(built.ok).toBe(true)
+    if (!built.ok) return
+
+    const { rows, truncated } = visibleRows(built.value, new Set(), 10)
+    expect(rows).toHaveLength(10)
+    expect(truncated).toBe(true)
+  })
+
+  it('大输入默认只展开第一层', () => {
+    // 每个元素都是单元素数组：2010 个元素 → 1 + 2010 × 2 个节点，越过自动折叠阈值
+    const big = `[${Array.from(
+      { length: TREE_AUTO_COLLAPSE_NODES + 10 },
+      (_, index) => `[${index}]`,
+    ).join(',')}]`
+    const built = buildJsonTree(big)
+    expect(built.ok).toBe(true)
+    if (!built.ok) return
+
+    // depth ≥ 1 的容器全部进入默认折叠集合（根留着，否则界面只剩一行 $）
+    expect(built.value.collapsedByDefault).toHaveLength(TREE_AUTO_COLLAPSE_NODES + 10)
+    expect(built.value.collapsedByDefault.slice(0, 2)).toEqual(['$[0]', '$[1]'])
+
+    const { rows, truncated } = visibleRows(built.value, new Set(built.value.collapsedByDefault), 10)
+    expect(rows.slice(0, 3).map((row) => row.node.path)).toEqual(['$', '$[0]', '$[1]'])
+    expect(rows).toHaveLength(10)
+    expect(truncated).toBe(true)
+  })
+})
+
+describe('与类型提示的口径一致', () => {
+  it('树的前序类型标签序列与 collectTypeHints 完全一致', () => {
+    const text = '{"a":[1,"s",true,null],"b":{"c":[]}}'
+    const built = buildJsonTree(text)
+    expect(built.ok).toBe(true)
+    if (!built.ok) return
+
+    const treeLabels: string[] = []
+    const visit = (node: JsonTreeNode): void => {
+      treeLabels.push(node.label)
+      for (const child of node.children) visit(child)
+    }
+    visit(built.value.root)
+
+    const hintLabels = collectTypeHints(JSON.parse(text) as unknown).map((hint) => hint.label)
+    expect(treeLabels).toEqual(hintLabels)
+  })
+})
+
+describe('collapseAllPaths', () => {
+  it('给出除根以外全部容器路径，供「全部折叠」使用', () => {
+    const built = buildJsonTree('{"a":{"b":[1]}}')
+    expect(built.ok).toBe(true)
+    if (!built.ok) return
+
+    expect(collapseAllPaths(built.value).sort()).toEqual(['$.a', '$.a.b'])
   })
 })
