@@ -161,3 +161,29 @@
 - 覆盖表（12 条 JSON 视图 Scenario）：`docs/superpowers/plans/2026-09-16-it-toolbox-json-view.md` 末尾「执行记录」（控制器机器核验：12 行逐字同序、19 处 `文件:行` 引用零错行、18 个被引 `it` 名全部命中）。
 - 实机验收清单：`openspec/changes/it-toolbox-app/manual-qa.md`（4 条，状态均为「未执行」）。
 - 本报告由 8 个只读 subagent 的逐条核对结果汇总，控制器亲验了 W1/W2 两处分歧、4 处「未覆盖＝环境不可构造」与全部自动化门禁。
+
+---
+
+## 8. 归档阶段补充记录（验证后追加）
+
+### 8.1 两项待决策的落定
+
+- **W3（设计文档漂移）→ 选 A**：已在技术设计文档追加 `## 12. Implementation Divergence`（提交 `323e25c`），记录两组 JSON 视图要求（`tool-registry` 语法高亮 4 条 + `dev-tools` 树形视图 8 条）的落点、8 条实际固化的设计决策与「未回填」原因；W1/W2 仅注明未裁定，指向本报告 §5。
+- **分支处理 → 本地合并到主分支**：`main (7b01959) → it-toolbox-app (a742ecc)` 共 **102 个提交 / 210 文件 / +42464 −105**，主分支独有提交 **0**，以 **`--ff-only` 快进**合并（无 merge commit、未改写历史）；合并后 `main` = `a742ecc`，`main..it-toolbox-app` 剩余 0。验证守卫四项全绿 → `verify_result=pass`、`verified_at=2026-09-16`、`phase=archive`（提交 `3f7af09`）。
+
+### 8.2 归档执行结果
+
+`comet-archive it-toolbox-app`：入口校验 PASS、**13/13 steps succeeded**（dry-run 预览与实际一致）。
+
+- 7 份 delta spec 同步到 `openspec/specs/`：**38 Requirement / 193 Scenario**，与 delta 逐项条数一致（`app-shell` 9/26、`tool-registry` 11/35、`crypto-tools` 5/29、`converter-tools` 5/33、`web-tools` 4/33、`dev-tools` 3/26、`image-tools` 1/11）。
+- change 移至 `openspec/changes/archive/2026-09-16-it-toolbox-app/`，其 `.comet.yaml` 中 `archived: true`。
+- 设计文档与计划已加前置元数据：`archived-with: 2026-09-16-it-toolbox-app`、`status: final`。
+- 收尾提交 `419eb91`。
+
+### 8.3 新增发现 W7（归档脚本缺口，已当场修复）
+
+**问题**：`comet-archive` 的 delta→主 spec 同步是**原样复制**。本次主 spec 为空（7 个 capability 全为新增、delta 用的是 `## ADDED Requirements`），于是 7 份主 spec 都缺 `## Purpose` / `## Requirements`，`openspec validate --specs` 报 **0 passed / 7 failed**（`Spec must have a Purpose section…`）。归档脚本本身退出码 0，如果只看脚本结果就会带着 7 份**不合法的 canonical spec** 收尾。
+
+**修复**：把每份主 spec 的首行 `## ADDED Requirements` 改为 `## Purpose` + 目的说明 + `## Requirements`；目的说明**逐字取自归档内的 `proposal.md`**（各 capability 的 Capabilities 描述），不新造内容。修改后 `openspec validate`：**7 passed / 0 failed**，Requirement / Scenario 条数不变（38 / 193）。
+
+**影响与建议**：仅影响「主 spec 为空 + 全新增」的首次归档；若主 spec 已有基线（走 `## MODIFIED` / `## REMOVED` 路径）不受影响。建议把这一条（同步后自动补 `## Purpose` 并跑一次 `openspec validate --specs`）反馈给 comet 的归档脚本，否则每个新项目第一次归档都会踩到。
