@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { utf8ByteLength } from '@/core/bytes'
 import { formatJson, type JsonIndent } from '@/core/json/format'
 import { parseJsonValue } from '@/core/json/parse'
+import { buildJsonTree } from '@/core/json/tree'
 import { collectTypeHints } from '@/core/json/type-hints'
 import { ToolLayout } from '@/framework/ToolLayout'
 import { useToolState } from '@/framework/useToolState'
@@ -12,12 +13,13 @@ import { EmptyState } from '@/framework/ui/EmptyState'
 import { ErrorNote } from '@/framework/ui/ErrorNote'
 import { Checkbox, SegmentedControl } from '@/framework/ui/Inputs'
 import { JsonCode } from '@/framework/ui/JsonCode'
+import { JsonTree } from '@/framework/ui/JsonTree'
 import { Spinner } from '@/framework/ui/Spinner'
 import type { SelectOption } from '@/framework/ui'
 
 /** UI 里的选项只能是字符串，故用 '2' | '4' | 'tab'，落到 Core 时再换算 */
 type IndentChoice = '2' | '4' | 'tab'
-type ViewChoice = 'json' | 'hints'
+type ViewChoice = 'json' | 'hints' | 'tree'
 
 const INDENT_OPTIONS: readonly SelectOption<IndentChoice>[] = [
   { value: '2', label: '2 空格' },
@@ -28,6 +30,7 @@ const INDENT_OPTIONS: readonly SelectOption<IndentChoice>[] = [
 const VIEW_OPTIONS: readonly SelectOption<ViewChoice>[] = [
   { value: 'json', label: 'JSON' },
   { value: 'hints', label: '类型提示' },
+  { value: 'tree', label: '树形' },
 ]
 
 const INDENT_LABEL: Record<IndentChoice, string> = {
@@ -102,6 +105,12 @@ export default function JsonFormatTool() {
     return parsed.ok ? collectTypeHints(parsed.value) : []
   }, [view, output, input])
 
+  // 树只在切到该视图时构建：与类型提示同理，大输入下不该白花这份钱
+  const tree = useMemo(
+    () => (view !== 'tree' || output === null ? null : buildJsonTree(input)),
+    [view, output, input],
+  )
+
   const preview = useMemo(() => {
     if (output === null) return null
     const lines = output.split('\n')
@@ -172,9 +181,9 @@ export default function JsonFormatTool() {
 
             <div className="flex items-center justify-between gap-2 border-b border-border px-1.5 py-1">
               <span className="text-[11px] text-muted">
-                {view === 'hints' ? '逐值类型提示' : '格式化结果'}
+                {view === 'hints' ? '逐值类型提示' : view === 'tree' ? '树形视图' : '格式化结果'}
               </span>
-              {view === 'json' && (
+              {view !== 'hints' && (
                 <span className="flex items-center gap-1">
                   <CopyButton text={output ?? ''} label="复制" />
                   <DownloadButton
@@ -187,7 +196,13 @@ export default function JsonFormatTool() {
               )}
             </div>
 
-            {view === 'hints' ? (
+            {view === 'tree' ? (
+              tree === null || !tree.ok ? (
+                <p className="p-2.5 text-[12px] text-muted">（尚无可用结果）</p>
+              ) : (
+                <JsonTree tree={tree.value} label="树形视图" />
+              )
+            ) : view === 'hints' ? (
               hints.length === 0 ? (
                 <p className="p-2.5 text-[12px] text-muted">（没有可提示的值）</p>
               ) : (

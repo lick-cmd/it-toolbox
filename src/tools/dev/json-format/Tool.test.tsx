@@ -236,3 +236,47 @@ describe('JSON 美化 —— 只读视图由框架层着色', () => {
     expect(document.querySelector('[data-testid="json-code"] .json-string')).toBeTruthy()
   })
 })
+
+describe('树形视图', () => {
+  it('切到树形后展示可折叠节点，折叠后显示摘要', async () => {
+    const user = userEvent.setup()
+    render(<JsonFormatTool />)
+
+    setInput('{"a":{"b":1,"c":2}}')
+    await user.click(screen.getByRole('button', { name: '树形' }))
+
+    expect(document.querySelector('[data-testid="json-tree"]')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: '折叠 $.a' }))
+    expect(screen.getByText('{…} 2 键')).toBeTruthy()
+  })
+
+  it('树形视图同样给出复制与下载入口', async () => {
+    const user = userEvent.setup()
+    render(<JsonFormatTool />)
+
+    setInput('{"a":1}')
+    await user.click(screen.getByRole('button', { name: '树形' }))
+
+    expect(screen.getByRole('button', { name: '复制' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '下载' })).toBeTruthy()
+  })
+
+  it('非法输入时树形视图显示错误而非节点', async () => {
+    const user = userEvent.setup()
+    render(<JsonFormatTool />)
+
+    setInput('{"a":}')
+    await user.click(screen.getByRole('button', { name: '树形' }))
+
+    expect(document.querySelector('[data-testid="json-tree"]')).toBeNull()
+    expect(screen.getByRole('alert')).toBeTruthy() // ErrorNote
+  })
+
+  it('空输入时树形视图显示空态', async () => {
+    const user = userEvent.setup()
+    render(<JsonFormatTool />)
+
+    await user.click(screen.getByRole('button', { name: '树形' }))
+    expect(screen.getByText('尚未输入')).toBeTruthy()
+  })
+})
