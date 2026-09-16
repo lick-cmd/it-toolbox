@@ -55,9 +55,12 @@ export function JsonTree({ tree, label, maxRows }: JsonTreeProps) {
     () => new Set(tree.collapsedByDefault),
   )
 
+  // 依赖只用文档原文：`buildJsonTree` 每次调用都返回**新的** `collapsedByDefault` 数组实例，
+  // 依赖数组身份会让「无关重建」（父组件换了缩进之类、文档一个字没变）把用户的手动折叠抹掉。
+  // 默认折叠态是文档的纯函数（由 nodeCount 与深度决定），文档没变就不该重置。
   useEffect(() => {
     setCollapsed(new Set(tree.collapsedByDefault))
-  }, [tree.root.raw, tree.collapsedByDefault])
+  }, [tree.root.raw])
 
   const { rows, truncated } = visibleRows(tree, collapsed, maxRows ?? TREE_MAX_VISIBLE_ROWS)
 

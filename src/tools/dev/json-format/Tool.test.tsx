@@ -279,4 +279,18 @@ describe('树形视图', () => {
     await user.click(screen.getByRole('button', { name: '树形' }))
     expect(screen.getByText('尚未输入')).toBeTruthy()
   })
+
+  it('树形视图下改缩进不会把手动折叠抹掉', async () => {
+    const user = userEvent.setup()
+    render(<JsonFormatTool />)
+
+    setInput('{"a":{"b":1,"c":2}}')
+    await user.click(screen.getByRole('button', { name: '树形' }))
+    await user.click(screen.getByRole('button', { name: '折叠 $.a' }))
+
+    // 改缩进会让 output 变、进而重建 tree：手动折叠必须活下来
+    await user.click(screen.getByRole('button', { name: '4 空格' }))
+
+    expect(screen.getByRole('button', { name: '展开 $.a' })).toBeTruthy()
+  })
 })

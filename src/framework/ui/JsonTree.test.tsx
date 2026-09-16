@@ -83,4 +83,17 @@ describe('JsonTree', () => {
       '[…] 1 项',
     )
   })
+
+  it('文档没变时的等价重建不重置手动折叠', async () => {
+    // `buildJsonTree` 每次调用都给**新的** `collapsedByDefault` 数组实例：折叠重置的判据必须是
+    // **文档**，不是数组身份 —— 否则父组件换缩进一类的「无关重建」会抹掉用户的手动折叠。
+    const user = userEvent.setup()
+    const { rerender } = render(<JsonTree tree={treeOf('{"a":{"b":1},"c":2}')} />)
+
+    await user.click(screen.getByRole('button', { name: '折叠 $.a' }))
+    expect(screen.getByRole('button', { name: '展开 $.a' })).toBeTruthy()
+
+    rerender(<JsonTree tree={treeOf('{"a":{"b":1},"c":2}')} />)
+    expect(screen.getByRole('button', { name: '展开 $.a' })).toBeTruthy()
+  })
 })
