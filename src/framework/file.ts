@@ -85,3 +85,19 @@ export async function downloadText(
   if (isTauri()) return downloadViaTauri(filename, text)
   return downloadBlob(filename, new Blob([text], { type }))
 }
+
+/**
+ * 导出任意字节序列。
+ *
+ * 单独提供这一入口的原因：`downloadText` 会对内容做 UTF-8 编码，而
+ * Base64 解码后的产物（图片、压缩包等）必须逐字节落盘，不能经过文本层。
+ * `bytes.slice()` 复制一份再交给 Blob：切片结果的类型是
+ * `Uint8Array<ArrayBuffer>`，能直接满足 `BlobPart` 的类型约束。
+ */
+export async function downloadBytes(
+  filename: string,
+  bytes: Uint8Array,
+  mime = 'application/octet-stream',
+): Promise<Result<void>> {
+  return downloadBlob(filename, new Blob([bytes.slice()], { type: mime }))
+}

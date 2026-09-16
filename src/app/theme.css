@@ -84,3 +84,107 @@ body {
 * {
   min-width: 0;
 }
+
+/* Markdown 预览：preflight 清掉了 h1/table 的默认样式，此处按信息密度要求重建 */
+.md-preview > :first-child {
+  margin-top: 0;
+}
+
+.md-preview h1 {
+  font-size: 1.5em;
+  font-weight: 600;
+  margin: 0.8em 0 0.4em;
+}
+
+.md-preview h2 {
+  font-size: 1.3em;
+  font-weight: 600;
+  margin: 0.8em 0 0.4em;
+}
+
+.md-preview h3 {
+  font-size: 1.1em;
+  font-weight: 600;
+  margin: 0.7em 0 0.3em;
+}
+
+.md-preview p {
+  margin: 0.5em 0;
+}
+
+.md-preview ul,
+.md-preview ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+
+.md-preview ul {
+  list-style: disc;
+}
+
+.md-preview ol {
+  list-style: decimal;
+}
+
+.md-preview blockquote {
+  margin: 0.5em 0;
+  padding-left: 0.8em;
+  border-left: 3px solid var(--app-border);
+  color: var(--app-muted);
+}
+
+.md-preview code {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  background: var(--app-surface-2);
+  border-radius: var(--radius-sm);
+  padding: 0 0.25em;
+}
+
+.md-preview pre {
+  margin: 0.5em 0;
+  padding: 0.6em 0.8em;
+  background: var(--app-surface-2);
+  border-radius: var(--radius-md);
+  overflow: auto;
+}
+
+.md-preview pre code {
+  background: none;
+  padding: 0;
+}
+
+.md-preview table {
+  border-collapse: collapse;
+  margin: 0.5em 0;
+}
+
+.md-preview th,
+.md-preview td {
+  border: 1px solid var(--app-border);
+  padding: 0.25em 0.5em;
+  text-align: left;
+}
+
+.md-preview th {
+  background: var(--app-surface-2);
+}
+
+.md-preview .md-image-block {
+  display: block;
+  margin: 0.5em 0;
+  padding: 0.4em 0.6em;
+  border: 1px dashed var(--app-border);
+  border-radius: var(--radius-md);
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.md-preview .md-link {
+  color: var(--app-accent);
+}
+
+.md-preview .md-link-url {
+  color: var(--app-muted);
+  font-size: 12px;
+}

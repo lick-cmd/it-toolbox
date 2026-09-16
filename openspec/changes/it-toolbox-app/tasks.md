@@ -65,18 +65,18 @@
 
 ## 6. 转换器工具
 
-- [ ] 6.1 实现 `core/converter/date.ts`：多格式解析（秒/毫秒时间戳、ISO 8601、常见日期格式）与多表示输出
-- [ ] 6.2 实现 `core/converter/base64.ts`：标准/URL-safe、填充开关、UTF-8 文本与二进制
-- [ ] 6.3 实现 `core/converter/yaml.ts`：`yamlToJson` 与 `jsonToYaml`，含行号错误定位与缩进配置
-- [ ] 6.4 实现 `core/converter/markdown.ts`：Markdown 渲染与输出转义（防脚本执行）
-- [ ] 6.5 编写上述 Core 的 Vitest 用例，覆盖 spec 中全部 Scenario（含往返一致性断言）
-- [ ] 6.6 实现日期转换器工具（含无法识别的提示、结果逐项复制）
-- [ ] 6.7 实现 Base64 编码/解码工具（含拖入文件编码、导出解码后文件、非法输入提示）
-- [ ] 6.8 实现 YAML 转 JSON 工具（含缩进配置与语法错误行号提示）
-- [ ] 6.9 实现 JSON 转 YAML 工具（含错误位置提示）
-- [ ] 6.10 实现 Markdown 转 HTML 工具（源码视图 + 安全预览 + 复制源码）
-- [ ] 6.11 日期转换器补充：时间戳单位可手动指定（自动/秒/毫秒/微秒/纳秒），并展示歧义输入所采用的判定依据
-- [ ] 6.12 Markdown 转 HTML 补充：远程图片渲染为占位块（不发起加载），外部链接不在应用窗口内导航
+- [x] 6.1 实现 `core/converter/date.ts`：多格式解析（秒/毫秒时间戳、ISO 8601、常见日期格式）与多表示输出
+- [x] 6.2 实现 `core/converter/base64.ts`：标准/URL-safe、填充开关、UTF-8 文本与二进制
+- [x] 6.3 实现 `core/converter/yaml.ts`：`yamlToJson` 与 `jsonToYaml`，含行号错误定位与缩进配置
+- [x] 6.4 实现 `core/converter/markdown.ts`：Markdown 渲染与输出转义（防脚本执行）
+- [x] 6.5 编写上述 Core 的 Vitest 用例，覆盖 spec 中全部 Scenario（含往返一致性断言）
+- [x] 6.6 实现日期转换器工具（含无法识别的提示、结果逐项复制）
+- [x] 6.7 实现 Base64 编码/解码工具（含拖入文件编码、导出解码后文件、非法输入提示）
+- [x] 6.8 实现 YAML 转 JSON 工具（含缩进配置与语法错误行号提示）
+- [x] 6.9 实现 JSON 转 YAML 工具（含错误位置提示）
+- [x] 6.10 实现 Markdown 转 HTML 工具（源码视图 + 安全预览 + 复制源码）
+- [x] 6.11 日期转换器补充：时间戳单位可手动指定（自动/秒/毫秒/微秒/纳秒），并展示歧义输入所采用的判定依据
+- [x] 6.12 Markdown 转 HTML 补充：远程图片渲染为占位块（不发起加载），外部链接不在应用窗口内导航
 
 ## 7. Web 工具
 
