@@ -3782,13 +3782,13 @@ Expected: PASS，9 个用例全绿（RSA 8 + Button 1）
 
 Run: `npm test > .superpowers/sdd/2026-09-15-it-toolbox-foundation/p02-t10-all.log 2>&1; echo "test=$?"; npm run typecheck > /dev/null 2>&1; echo "tc=$?"; npm run lint > /dev/null 2>&1; echo "lint=$?"; grep -aE "Test Files|Tests " .superpowers/sdd/2026-09-15-it-toolbox-foundation/p02-t10-all.log | tail -2`
 
-Expected: `test=0 tc=0 lint=0`，用例总数为 **393 + 9 = 402**
+Expected: `test=0 tc=0 lint=0`，用例总数为 **393 + 12 = 405**（计划原写 9，见下方执行期修正）
 
 - [ ] **Step 7: 提交**
 
 ```bash
 git add src/tools/crypto/rsa-key-generator src/framework/ui/Inputs.tsx src/framework/ui/Inputs.test.tsx src/framework/ui/index.ts
-git commit -m "feat(crypto): 实现 RSA 密钥对生成器工具与 Button 原语（5.6）
+git commit -m "feat(crypto): 实现 RSA 密钥对生成器工具与 Button 原语（5.11）
 
 - 改参数不自动重算，状态行提示「参数已变更，点击生成以应用」
 - 私钥只存内存不落盘（useToolState 会写 localStorage），参数照常持久化
@@ -3796,6 +3796,22 @@ git commit -m "feat(crypto): 实现 RSA 密钥对生成器工具与 Button 原�
 - 公钥/私钥各用一个带 aria-label 的 region，便于按区域取值与导出
 - 新增 Button 原语，沿用 CopyButton 的类名约定"
 ```
+
+> **执行期修正（2026-09-16）**：用例数 **9 → 12**（RSA 11 + Button 1）；提交信息里的 `5.6` 为笔误，实际对应 `tasks.md` 5.11。
+> 1. **计划缺陷（jest-dom，第四次复发）**：`toBeInTheDocument` ×6、`toBeDisabled`/`toBeEnabled`、`toHaveTextContent`、`toHaveValue` 共 8 处 ⇒ 必然 `Invalid Chai property`，改为语义等价断言。
+> 2. **计划缺陷（内联 `import()` 类型注解，第二次）**：`vi.mock` 工厂里的 `importOriginal<typeof import('@/core/crypto/rsa')>()` 被 `consistent-type-imports` 判 error ⇒ 改命名空间类型导入（T9 已踩过，本计划未同步）。
+> 3. **计划缺陷（文案撞车，第二次）**：`getByText('尚未生成')` 会同时命中 `EmptyState` 标题与**状态行** ⇒ `Found multiple elements`。改为断言只属于空态的提示文案「选择参数后点击生成」。
+> 4. **偏离**：「生成中禁用」原用 `delayMs = 40` 制造时间窗，慢机器上会在断言前结束 ⇒ 改挂起式 mock（与 hmac-generator 同款），断言与墙钟无关。
+> 5. **评审（只读子代理，0 误报：1 Critical / 4 Important / 7 Minor）**：
+>    - **C-1（真缺陷，已修）**：导出文件名由**实时参数**推导，只改公钥格式而不重新生成时出现「文件名叫 public.pub、内容却是 SPKI PEM」⇒ 改为跟随生成快照，并补用例钉住两种情形（回退该修复的变异实测被杀）。
+>    - **I-3（任务书交付面零覆盖，已补）**：5.11 要求「公钥私钥分别复制与导出」，原计划既不点复制也不点下载 ⇒ 新增「复制 payload」与「导出文件名与内容一致」两条用例；公私互换的变异实测被杀。
+>    - **I-4（已补）**：`isStale` 的两个格式维度从未被单独触发（只比 `keySize` 的变异可存活）⇒ 用例 4 隔离出「只改私钥格式」，并钉住「改回原值即复位」。变异实测被杀。
+>    - **I-1 / I-2（已修）**：固定 150ms 时间窗、以及真实 2048 位生成压在 `waitFor` 默认 1000ms 上 ⇒ 改挂起式 mock + 显式 5s timeout。
+>    - **Minor 已采纳**：补 Spinner（`role=status`）断言以覆盖 spec 的「进行中状态」；`ssh-rsa` 子句在默认 SPKI 下恒真 ⇒ 改用 OpenSSH 公钥生成；失败用例名与文件头改为「残留 pair 不可观测」。
+>    - **判定不成立 / 接受**：删掉 catch 里 `setPair(null)` 的变异经评审与本实现双方独立复核，确为**行为等价**（错误分支渲染优先，残留 pair 在其生命周期内没有渲染窗口）；`getBy*` 后跟 `toBeDefined()`、`afterEach(vi.restoreAllMocks)`、`Button` 不透传 `className` 三项接受（前者为仓库既有约定，后两者列为后续收敛项）。
+>    - **更正**：spec 的 RSA Requirement 实为 **6 个 Scenario**（本任务开头写的「4 个」与执行者一度记作 5 均有误）。逐条核对：生成 2048 位 / 私钥格式 / 公钥格式 / 生成期间的状态 / **公钥私钥相互匹配**（由 Task 6 的 `rsa.test.ts` 签名-验签往返 + 三组独立 DER/SSH 结构互校覆盖，非空断言）/ 参数变更不自动重算 —— 全部有真实覆盖。
+> 6. **共享文件处置**：`src/framework/ui/index.ts` 同时被并行工作流改着（未提交的 `FileDrop` 导出）⇒ 用「HEAD 版本 + 本任务的 Button 导出行」合成 blob 精确入暂存（`git hash-object -w` + `git update-index --cacheinfo`），既完成导出又不把未追踪引用带进本提交。
+> 7. 计划下游累计值同步：本任务 **402 → 405**。
 
 ---
 
