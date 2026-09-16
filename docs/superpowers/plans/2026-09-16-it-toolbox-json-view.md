@@ -1288,6 +1288,19 @@ describe('JsonTree', () => {
       '[…] 1 项',
     )
   })
+
+  it('文档没变时的等价重建不重置手动折叠', async () => {
+    // `buildJsonTree` 每次调用都给**新的** `collapsedByDefault` 数组实例：折叠重置的判据必须是
+    // **文档**，不是数组身份 —— 否则父组件换缩进一类的「无关重建」会抹掉用户的手动折叠。
+    const user = userEvent.setup()
+    const { rerender } = render(<JsonTree tree={treeOf('{"a":{"b":1},"c":2}')} />)
+
+    await user.click(screen.getByRole('button', { name: '折叠 $.a' }))
+    expect(screen.getByRole('button', { name: '展开 $.a' })).toBeTruthy()
+
+    rerender(<JsonTree tree={treeOf('{"a":{"b":1},"c":2}')} />)
+    expect(screen.getByRole('button', { name: '展开 $.a' })).toBeTruthy()
+  })
 })
 ```
 
@@ -1358,9 +1371,12 @@ export function JsonTree({ tree, label, maxRows }: JsonTreeProps) {
     () => new Set(tree.collapsedByDefault),
   )
 
+  // 依赖只用文档原文：`buildJsonTree` 每次调用都返回**新的** `collapsedByDefault` 数组实例，
+  // 依赖数组身份会让「无关重建」（父组件换了缩进之类、文档一个字没变）把用户的手动折叠抹掉。
+  // 默认折叠态是文档的纯函数（由 nodeCount 与深度决定），文档没变就不该重置。
   useEffect(() => {
     setCollapsed(new Set(tree.collapsedByDefault))
-  }, [tree.root.raw, tree.collapsedByDefault])
+  }, [tree.root.raw])
 
   const { rows, truncated } = visibleRows(tree, collapsed, maxRows ?? TREE_MAX_VISIBLE_ROWS)
 
@@ -1438,7 +1454,7 @@ export function JsonTree({ tree, label, maxRows }: JsonTreeProps) {
 - [ ] **Step 4: 跑用例确认通过**
 
 Run: `npx vitest run --project ui src/framework/ui/JsonTree.test.tsx`
-Expected: PASS（7 条）。
+Expected: PASS（8 条）。
 
 - [ ] **Step 5: 在 `src/app/theme.test.tsx` 补 JsonTree 侧的着色类对照断言**
 
@@ -1717,6 +1733,20 @@ describe('树形视图', () => {
     await user.click(screen.getByRole('button', { name: '树形' }))
     expect(screen.getByText('尚未输入')).toBeTruthy()
   })
+
+  it('树形视图下改缩进不会把手动折叠抹掉', async () => {
+    const user = userEvent.setup()
+    render(<JsonFormatTool />)
+
+    setInput('{"a":{"b":1,"c":2}}')
+    await user.click(screen.getByRole('button', { name: '树形' }))
+    await user.click(screen.getByRole('button', { name: '折叠 $.a' }))
+
+    // 改缩进会让 output 变、进而重建 tree：手动折叠必须活下来
+    await user.click(screen.getByRole('button', { name: '4 空格' }))
+
+    expect(screen.getByRole('button', { name: '展开 $.a' })).toBeTruthy()
+  })
 })
 ```
 
@@ -1821,7 +1851,7 @@ const tree = useMemo(
 - [ ] **Step 4: 跑用例确认通过**
 
 Run: `npx vitest run --project ui src/tools/dev/json-format/Tool.test.tsx`
-Expected: PASS（原有用例 + 新增 4 条）。
+Expected: PASS（原有用例 + 新增 5 条）。
 
 - [ ] **Step 5: 提交**
 
