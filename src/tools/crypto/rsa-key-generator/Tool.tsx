@@ -73,6 +73,11 @@ export default function RsaKeyGeneratorTool() {
     publicKeyFormat,
   })
 
+  // 导出文件名必须跟随**已生成结果**的格式：只改公钥格式而不重新生成时，结果区内容仍是旧格式，
+  // 文件名若提前跳到 public.pub 就会名实不符（用户拿到的 .pub 里其实是 PEM）。
+  // 结果区只在 pair !== null 时渲染，而 pair 与 snapshot 同生同灭，故 ?? 只用于满足类型。
+  const generatedPublicFormat = snapshot?.publicKeyFormat ?? publicKeyFormat
+
   // 刻意不写依赖参数的 useEffect：spec 要求结果保留直至用户重新生成
   const handleGenerate = async () => {
     setIsGenerating(true)
@@ -162,7 +167,7 @@ export default function RsaKeyGeneratorTool() {
                 <span className="inline-flex items-center gap-1">
                   <CopyButton text={pair.publicKey} label="复制公钥" />
                   <DownloadButton
-                    filename={publicKeyFormat === 'openssh' ? 'public.pub' : 'public.pem'}
+                    filename={generatedPublicFormat === 'openssh' ? 'public.pub' : 'public.pem'}
                     text={pair.publicKey}
                   />
                 </span>
