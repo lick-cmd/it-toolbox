@@ -822,7 +822,9 @@ describe('JsonCode', () => {
     const value = '{"a":"\\u0041","n":1e2,"b":true,"z":null}'
     const { container } = render(<JsonCode value={value} />)
 
-    expect(container.querySelectorAll('.json-string')).toHaveLength(2) // 键与字符串值
+    // 键也是 string token：扫描器不区分键与值，两者都是引号开头的 string。
+    // 故 4 个键（a/n/b/z）+ 1 个字符串值（"\u0041"）= 5。
+    expect(container.querySelectorAll('.json-string')).toHaveLength(5)
     expect(container.querySelectorAll('.json-number')).toHaveLength(1)
     expect(container.querySelectorAll('.json-literal')).toHaveLength(2) // true 与 null
     expect(linesOf(container).join('\n')).toBe(value)
