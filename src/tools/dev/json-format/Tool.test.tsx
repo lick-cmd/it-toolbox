@@ -405,3 +405,29 @@ describe('树形与源码的一致性', () => {
     })
   })
 })
+
+describe('JSON 美化 —— 搜索键与值', () => {
+  const search = () => screen.getByRole('textbox', { name: '搜索键和值' })
+
+  it('搜到键与值并高亮命中、给出计数', () => {
+    render(<JsonFormatTool />)
+    setInput('{"name":"alice","city":"beijing"}')
+
+    fireEvent.change(search(), { target: { value: 'alice' } })
+    expect(document.querySelectorAll('mark.json-search-hit')).toHaveLength(1)
+    expect(screen.getByTestId('json-search-count').textContent).toBe('第 1 / 1 处')
+
+    fireEvent.change(search(), { target: { value: 'name' } })
+    expect(document.querySelectorAll('mark.json-search-hit')).toHaveLength(1)
+  })
+
+  it('搜索框只属于格式化视图，切到树形视图后不再出现', async () => {
+    const user = userEvent.setup()
+    render(<JsonFormatTool />)
+    setInput('{"a":1}')
+
+    expect(search()).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: '树形' }))
+    expect(screen.queryByRole('textbox', { name: '搜索键和值' })).toBeNull()
+  })
+})

@@ -4,7 +4,7 @@ export default {
   id: 'json-format',
   name: 'JSON 美化',
   category: 'dev',
-  description: '按 2 空格 / 4 空格 / 制表符缩进格式化 JSON，可选键排序与逐值类型提示',
+  description: '按 2 空格 / 4 空格 / 制表符缩进格式化 JSON，支持搜索键与值、可选键排序与逐值类型提示',
   keywords: [
     'json',
     'format',
@@ -13,6 +13,8 @@ export default {
     '美化',
     '格式化',
     '缩进',
+    '搜索',
+    '查找',
     '键排序',
     '类型提示',
   ],

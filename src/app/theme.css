@@ -223,6 +223,19 @@ body {
   color: var(--json-punct);
 }
 
+/* 搜索命中：命中片段可能同时带着 json-* 着色类，这里叠一层背景并接管文字色，保证对比度 */
+.json-search-hit {
+  background: var(--app-accent);
+  color: #ffffff;
+  border-radius: 2px;
+}
+
+/* 当前命中与其余命中区分开，便于「上下一个」逐条查看 */
+.json-search-hit-active {
+  background: var(--app-warn);
+  color: #1c1f28;
+}
+
 .json-type {
   color: var(--app-muted);
   font-size: 11px;

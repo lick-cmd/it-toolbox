@@ -239,7 +239,7 @@ export default function JsonFormatTool() {
                     JSON）；复制与下载给的是完整内容。
                   </p>
                 )}
-                <JsonCode value={preview?.text ?? ''} label="格式化结果" foldable />
+                <JsonCode value={preview?.text ?? ''} label="格式化结果" foldable searchable />
               </>
             )}
           </>

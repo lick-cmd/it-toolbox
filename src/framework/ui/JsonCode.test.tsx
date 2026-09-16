@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { buildJsonTree } from '@/core/json/tree'
@@ -198,5 +198,103 @@ describe('framework/ui 桶导出', () => {
     if (!built.ok) throw new Error(built.error)
     render(<JsonTreeFromBarrel tree={built.value} />)
     expect(document.querySelector('[data-testid="json-tree"]')).toBeTruthy()
+  })
+})
+
+describe('JsonCode 搜索', () => {
+  // 行号（1 起算）与代码图的对应：1 `{` / 2 `  "name": "alice",` / 3 `  "city": "beijing"` / 4 `}`
+  const VALUE = '{\n  "name": "alice",\n  "city": "beijing"\n}'
+
+  const searchInput = () => screen.getByRole('textbox', { name: '搜索键和值' })
+  const setQuery = (value: string) => fireEvent.change(searchInput(), { target: { value } })
+
+  it('默认不渲染搜索工具条（其它工具不受影响）', () => {
+    render(<JsonCode value={VALUE} />)
+    expect(screen.queryByRole('textbox', { name: '搜索键和值' })).toBeNull()
+  })
+
+  it('命中键与值并标出总数，且不打乱原文', () => {
+    const { container } = render(<JsonCode value={VALUE} searchable />)
+    setQuery('i')
+
+    // alice 一个 i、city 一个 i、beijing 两个 i（name 无 i）
+    expect(container.querySelectorAll('mark.json-search-hit')).toHaveLength(4)
+    expect(screen.getByTestId('json-search-count').textContent).toBe('第 1 / 4 处')
+    // 高亮只是插入标记，逐行文本仍与原文一致
+    expect(linesOf(container).join('\n')).toBe(VALUE)
+  })
+
+  it('只搜键与值：纯标点关键词没有命中', () => {
+    const { container } = render(<JsonCode value={VALUE} searchable />)
+    setQuery('{')
+
+    expect(container.querySelectorAll('mark.json-search-hit')).toHaveLength(0)
+    expect(screen.getByTestId('json-search-count').textContent).toBe('无匹配')
+  })
+
+  it('上一个 / 下一个切换当前命中并回绕', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<JsonCode value={VALUE} searchable />)
+    setQuery('i')
+
+    const activeIndex = () =>
+      container.querySelector('.json-search-hit-active')?.getAttribute('data-match-index')
+
+    expect(activeIndex()).toBe('0')
+
+    await user.click(screen.getByRole('button', { name: '下一个' }))
+    expect(activeIndex()).toBe('1')
+    expect(screen.getByTestId('json-search-count').textContent).toBe('第 2 / 4 处')
+
+    await user.click(screen.getByRole('button', { name: '上一个' }))
+    await user.click(screen.getByRole('button', { name: '上一个' }))
+    // 从第 0 条再往前回绕到末条
+    expect(activeIndex()).toBe('3')
+  })
+
+  it('可切换区分大小写', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<JsonCode value={VALUE} searchable />)
+    setQuery('Alice')
+
+    // 默认忽略大小写
+    expect(container.querySelectorAll('mark.json-search-hit')).toHaveLength(1)
+
+    await user.click(screen.getByRole('checkbox', { name: '区分大小写' }))
+    expect(container.querySelectorAll('mark.json-search-hit')).toHaveLength(0)
+    expect(screen.getByTestId('json-search-count').textContent).toBe('无匹配')
+  })
+
+  it('清除按钮还原关键词', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<JsonCode value={VALUE} searchable />)
+    setQuery('i')
+    expect(container.querySelectorAll('mark.json-search-hit')).toHaveLength(4)
+
+    await user.click(screen.getByRole('button', { name: '清除' }))
+    expect(container.querySelectorAll('mark.json-search-hit')).toHaveLength(0)
+    expect((searchInput() as HTMLInputElement).value).toBe('')
+  })
+
+  it('跳到被折叠挡住的命中时自动展开对应区间', async () => {
+    const user = userEvent.setup()
+    const folded = '{\n  "a": {\n    "b": "needle"\n  }\n}'
+    const { container } = render(<JsonCode value={folded} foldable searchable />)
+
+    setQuery('needle')
+    await user.click(screen.getByRole('button', { name: '折叠 第 2 行' }))
+    expect(container.querySelector('.json-search-hit')).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: '下一个' }))
+    expect(container.querySelector('.json-search-hit')).not.toBeNull()
+  })
+
+  it('文本无法解析（预览被截断）时降级为纯文本搜索，仍能定位', () => {
+    const truncated = '{\n  "a": "needle'
+    const { container } = render(<JsonCode value={truncated} searchable />)
+    setQuery('needle')
+
+    expect(container.querySelectorAll('mark.json-search-hit')).toHaveLength(1)
+    expect(linesOf(container).join('\n')).toBe(truncated)
   })
 })
