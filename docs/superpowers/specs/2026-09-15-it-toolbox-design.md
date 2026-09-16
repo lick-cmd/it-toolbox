@@ -2,6 +2,8 @@
 comet_change: it-toolbox-app
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-09-16-it-toolbox-app
+status: final
 ---
 
 # IT Toolbox 技术设计
@@ -35,6 +37,8 @@ canonical_spec: openspec
 
 本设计的全部取舍围绕一个目标：**把重复量最大的部分（元数据、布局、输入输出、复制导出、搜索路由、错误定位）收敛进框架，把真正有差异的部分（算法）放进可单测的 Core 层，使单个工具的实现量趋近于零。**
 
+archived-with: 2026-09-16-it-toolbox-app
+status: final
 ---
 
 ## 2. 分层架构
@@ -61,6 +65,8 @@ canonical_spec: openspec
 
 **备选否决**：算法直接写在 `Tool.tsx` 内。否决理由 —— 无法单测、热重载慢、17 个工具会各自重复错误处理与校验。
 
+archived-with: 2026-09-16-it-toolbox-app
+status: final
 ---
 
 ## 3. Core 层设计
@@ -211,6 +217,8 @@ UUID v1 的节点 ID：WebView 取不到 MAC 地址，固定使用随机生成�
 | `dev/json-format` | 输入 > 512KB 时先渲染"处理中"再延迟计算 | 满足"界面不出现无响应"。Web Worker 列为后续优化（YAGNI） |
 | `dev/json-format` | 体积统计用 UTF-8 字节数（`TextEncoder`），非 `String.length` | spec 说的是"字节数" |
 
+archived-with: 2026-09-16-it-toolbox-app
+status: final
 ---
 
 ## 4. 框架层设计
@@ -353,6 +361,8 @@ function isTauri(): boolean   // '__TAURI_INTERNALS__' in window
 
 按 `isTauri()` 分支，使 `tauri dev` 与纯浏览器预览都能工作，便于开发期快速验证 UI。
 
+archived-with: 2026-09-16-it-toolbox-app
+status: final
 ---
 
 ## 5. 离线保证：四层强制
@@ -386,6 +396,8 @@ background: url(…)
 - 不使用任何 Web 字体 / 图标字体 / CDN —— 字体走系统栈，约 20 个图标手写 SVG
 - 不引入任何遥测 / 崩溃上报 SDK
 
+archived-with: 2026-09-16-it-toolbox-app
+status: final
 ---
 
 ## 6. 打包策略
@@ -436,6 +448,8 @@ matrix:
 
 注意：Windows arm64 runner 的可用性需在实施时验证；若不可用，退化为本地交叉构建，并将 arm64 产物标注为实验性。
 
+archived-with: 2026-09-16-it-toolbox-app
+status: final
 ---
 
 ## 7. 依赖清单
@@ -457,6 +471,8 @@ matrix:
 | `zustand` / `redux` | 工具是自身状态的纯函数，无需全局 store |
 | 任何图标库 | 手写约 20 个 SVG，省体积且保证零外网 |
 
+archived-with: 2026-09-16-it-toolbox-app
+status: final
 ---
 
 ## 8. 测试策略
@@ -504,6 +520,8 @@ delta spec 的每个 Scenario 对应至少一个用例。这是测试覆盖率�
 - 剪贴板、文件拖放、导出（WKWebView 与 WebView2 行为差异）
 - 四平台产物安装与启动
 
+archived-with: 2026-09-16-it-toolbox-app
+status: final
 ---
 
 ## 9. 交付顺序
@@ -515,6 +533,8 @@ delta spec 的每个 Scenario 对应至少一个用例。这是测试覆盖率�
 
 **回滚**：仓库无历史代码，回滚等价于放弃该 change 分支。
 
+archived-with: 2026-09-16-it-toolbox-app
+status: final
 ---
 
 ## 10. 本轮深度设计对 delta spec 的 8 处修订
@@ -532,6 +552,8 @@ delta spec 的每个 Scenario 对应至少一个用例。这是测试覆盖率�
 | P7 | `app-shell` 新增 Windows 运行时前置条件 | 安装包不检测不安装 WebView2（`skip`），要求 Win10 1803+ / Win11；补充自备途径与 `offlineInstaller` 变体 | 默认配置下 Windows 安装需联网，与"离线"约束冲突 |
 | P8 | `converter-tools` Markdown 转 HTML | 远程图片渲染为占位块、不发起加载；外链不在 WebView 内导航 | 粘贴的 Markdown 中含远程图片会触发**真实外发请求**并携带用户内容 |
 
+archived-with: 2026-09-16-it-toolbox-app
+status: final
 ---
 
 ## 11. 已知取舍汇总
@@ -546,6 +568,8 @@ delta spec 的每个 Scenario 对应至少一个用例。这是测试覆盖率�
 | 工具组件不做逐个渲染测试 | 工具层回归依赖人工冒烟 | 算法已在 Core 层被覆盖；渲染层为薄壳 |
 | RSA 生成期间无进度回调 | WebCrypto 不提供进度事件 | 不确定进度态 + 已耗时展示 + 禁用重复提交 |
 
+archived-with: 2026-09-16-it-toolbox-app
+status: final
 ---
 
 ## 12. Implementation Divergence（增量实现与本文档的偏差记录）

@@ -11,6 +11,6 @@ verification_report: docs/superpowers/reports/2026-09-16-it-toolbox-app-verify.m
 branch_status: handled
 created_at: 2026-09-15
 verified_at: 2026-09-16
-archived: false
+archived: true
 handoff_context: openspec/changes/it-toolbox-app/.comet/handoff/design-context.json
 handoff_hash: 1f792b3d2263546029ea1d91d657a98f2c0f78fdf9c6f9abdceb3124bf557ff6

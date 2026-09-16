@@ -2,6 +2,7 @@
 change: it-toolbox-app
 design-doc: docs/superpowers/specs/2026-09-15-it-toolbox-design.md
 base-ref: f4497ace919e563ab43433da2a8b7c1bb3b09dc2
+archived-with: 2026-09-16-it-toolbox-app
 ---
 
 # IT Toolbox 基座与框架 实施计划
@@ -18,6 +19,7 @@ base-ref: f4497ace919e563ab43433da2a8b7c1bb3b09dc2
 
 **本计划的范围：** 对应 `tasks.md` 的 1、2、3、4 组全部，加 4.10/4.11 离线强制，加 5.2/5.8 的 UUID 样板。**不含**其余 16 个工具 —— 它们由计划② 承接，届时沿用本计划已证实的模式。
 
+archived-with: 2026-09-16-it-toolbox-app
 ---
 
 ## Global Constraints
@@ -49,6 +51,7 @@ base-ref: f4497ace919e563ab43433da2a8b7c1bb3b09dc2
 - `js-yaml` 5.x **已移除 `DEFAULT_SCHEMA`**，保留 `FAILSAFE_SCHEMA` / `JSON_SCHEMA` / `CORE_SCHEMA`（本方案用 `JSON_SCHEMA`）
 - `qrcode` 的 `create(text, opts)` 返回 `{ modules: { size: number; data: Uint8Array }, version: number }`
 
+archived-with: 2026-09-16-it-toolbox-app
 ---
 
 ## File Structure
@@ -123,6 +126,7 @@ it-tool/
     └── src/{main.rs, lib.rs}
 ```
 
+archived-with: 2026-09-16-it-toolbox-app
 ---
 
 ### Task 1: 前端工程脚手架 + `core/result.ts`
@@ -482,6 +486,7 @@ git commit -m "chore: 搭建前端工程脚手架并引入 Result 类型
 - core/result.ts：解析类操作的统一返回类型，含三定位与错误码字段"
 ```
 
+archived-with: 2026-09-16-it-toolbox-app
 ---
 
 ### Task 2: Tailwind 4 语义令牌与主题切换
@@ -694,6 +699,7 @@ git commit -m "feat(theme): 引入 Tailwind 4 语义令牌与主题切换
 - 开发者极简基调：13px UI 字号、12.5px 等宽代码区、4px 圆角"
 ```
 
+archived-with: 2026-09-16-it-toolbox-app
 ---
 
 ### Task 3: Tauri 工程与安全配置
@@ -941,6 +947,7 @@ git commit -m "feat(shell): 接入 Tauri 2 外壳与严格 CSP
 - capabilities 仅申请 dialog/fs/clipboard 所需权限，fs 作用域限定三个导出目录"
 ```
 
+archived-with: 2026-09-16-it-toolbox-app
 ---
 
 ### Task 4: ESLint 分层依赖硬约束
@@ -1081,6 +1088,7 @@ git commit -m "chore(lint): 以 ESLint 规则固化分层依赖约束
 - 依赖分层的正确性从此由构建保证，而非依赖代码评审"
 ```
 
+archived-with: 2026-09-16-it-toolbox-app
 ---
 
 ### Task 5: 离线四层强制
@@ -1511,6 +1519,7 @@ git commit -m "feat(offline): 落地离线四层强制中的检测层与预防�
 - 实测 CSP 在运行时拒绝外发且不破坏本地请求与 IPC"
 ```
 
+archived-with: 2026-09-16-it-toolbox-app
 ---
 
 ### Task 6: Core 字节与随机原语
@@ -2014,6 +2023,7 @@ git commit -m "feat(core): 新增字节转换与安全随机原语
 - randomBytes 按 65536 分块，规避 getRandomValues 的规范上限"
 ```
 
+archived-with: 2026-09-16-it-toolbox-app
 ---
 
 ### Task 7: JSON 扫描器（跨 WebView 一致性的承重件）
@@ -2519,6 +2529,7 @@ git commit -m "feat(core): 自实现 JSON 扫描器以统一跨 WebView 的错�
 - 表格驱动测试覆盖 22 种非法输入形态"
 ```
 
+archived-with: 2026-09-16-it-toolbox-app
 ---
 
 ### Task 8: token 级 JSON 压缩与格式化
@@ -2901,6 +2912,7 @@ git commit -m "feat(core): token 级 JSON 压缩与格式化
 - 体积统计使用 UTF-8 字节数而非 String.length"
 ```
 
+archived-with: 2026-09-16-it-toolbox-app
 ---
 
 ### Task 9: 工具元数据契约与类别
@@ -3400,6 +3412,7 @@ git commit -m "feat(framework): 工具注册表与不变式校验
 - 先用违规探针验证校验确实会失败，再删除探针"
 ```
 
+archived-with: 2026-09-16-it-toolbox-app
 ---
 
 ### Task 11: 搜索（中英边界切词 + 模糊匹配）
@@ -3751,6 +3764,7 @@ git commit -m "feat(framework): 搜索支持中英边界切词与模糊匹配
 - 测试使用固定样本集，不受当前工具数量影响"
 ```
 
+archived-with: 2026-09-16-it-toolbox-app
 ---
 
 ### Task 12: 持久化、工具状态与偏好
@@ -4259,6 +4273,7 @@ git commit -m "feat(framework): 持久化层、工具状态与偏好
 - useToolState 写入去抖 200ms，挂载时恢复历史输入"
 ```
 
+archived-with: 2026-09-16-it-toolbox-app
 ---
 
 ### Task 13: UI 原语集
@@ -4973,6 +4988,7 @@ git commit -m "feat(ui): 引入 UI 原语集
 - 全部使用语义令牌类名，无需编写 dark: 变体"
 ```
 
+archived-with: 2026-09-16-it-toolbox-app
 ---
 
 ### Task 14: 平台集成（剪贴板与文件导出）
@@ -5229,6 +5245,7 @@ git commit -m "feat(framework): 剪贴板与文件导出的跨环境集成
 - 下载后不遗留锚点元素，并延后释放 object URL"
 ```
 
+archived-with: 2026-09-16-it-toolbox-app
 ---
 
 ### Task 15: 工具布局、懒加载宿主与异常隔离
@@ -5506,6 +5523,7 @@ git commit -m "feat(framework): 工具布局、懒加载宿主与异常隔离
 - 崩溃被限制在工具面板内，侧栏与搜索仍可用"
 ```
 
+archived-with: 2026-09-16-it-toolbox-app
 ---
 
 ### Task 16: 应用外壳与侧栏
@@ -5954,6 +5972,7 @@ git commit -m "feat(app): 应用外壳、分类侧栏与窄窗折叠
 - system 主题监听 prefers-color-scheme 并正确清理监听器"
 ```
 
+archived-with: 2026-09-16-it-toolbox-app
 ---
 
 ### Task 17: 命令面板（Cmd/Ctrl+K）
@@ -6242,6 +6261,7 @@ git commit -m "feat(app): 命令面板与全局搜索快捷键
 - 页头提供可见入口，便于鼠标用户发现该功能"
 ```
 
+archived-with: 2026-09-16-it-toolbox-app
 ---
 
 ### Task 18: UUID 生成 Core（v1 / v4 / v7 与同毫秒单调）
@@ -6641,6 +6661,7 @@ git commit -m "feat(core): UUID v1 / v4 / v7 生成
 - uuidTimestampMs 对无时间语义的版本返回 null 而非 0"
 ```
 
+archived-with: 2026-09-16-it-toolbox-app
 ---
 
 ### Task 19: UUID 生成器工具（端到端样板）
@@ -6918,6 +6939,7 @@ git commit -m "feat(tools): UUID 生成器端到端打通样板链路
 - v1 在界面显式说明节点 ID 为会话级随机值"
 ```
 
+archived-with: 2026-09-16-it-toolbox-app
 ---
 
 ### Task 20: 全量验收与 tasks.md 勾选
@@ -7057,6 +7079,7 @@ git commit -m "docs: 补充 README 并勾选已完成任务
 - tasks.md 勾选计划① 覆盖的 45 项任务"
 ```
 
+archived-with: 2026-09-16-it-toolbox-app
 ---
 
 ## 计划自检
