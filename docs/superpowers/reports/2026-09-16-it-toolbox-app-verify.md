@@ -187,3 +187,50 @@
 **修复**：把每份主 spec 的首行 `## ADDED Requirements` 改为 `## Purpose` + 目的说明 + `## Requirements`；目的说明**逐字取自归档内的 `proposal.md`**（各 capability 的 Capabilities 描述），不新造内容。修改后 `openspec validate`：**7 passed / 0 failed**，Requirement / Scenario 条数不变（38 / 193）。
 
 **影响与建议**：仅影响「主 spec 为空 + 全新增」的首次归档；若主 spec 已有基线（走 `## MODIFIED` / `## REMOVED` 路径）不受影响。建议把这一条（同步后自动补 `## Purpose` 并跑一次 `openspec validate --specs`）反馈给 comet 的归档脚本，否则每个新项目第一次归档都会踩到。
+
+---
+
+## 9. 遗留项闭合记录（归档后追加）
+
+本节记录归档之后对本报告 §5 遗留项的处置。**判定方向**：W1/W2 一律**让实现对齐已归档的 canonical spec** —— spec 是要求源，把要求降级去迁就实现不作为默认路径。
+
+### 9.1 已闭合
+
+| 项 | 处置 | 证据 |
+| --- | --- | --- |
+| **W1** 无输入工具仍占输入区 | `ToolLayout` 的 `input` 省略时**整个输入面板不渲染**，输出占满整宽；原「说明文案借输入面板占位」的做法改为新增的可选 `note` 槽位。四个无输入工具全部改完：`uuid` / `ulid` / `token` / `rsa-key` 生成器（不止 UUID 一个） | `ToolLayout.tsx`（`note` + `props.input !== undefined` 条件渲染）、四个工具 `input={…}` → `note={…}`；`ToolLayout.test.tsx` 新增 2 条 |
+| **W2** 可编辑输入区对 `errorLine` 无反应 | 可编辑分支同样消费 `effectiveErrorLine`：容器 `data-error`、`textarea` 加 `aria-invalid` + 错误底色、右上角显示「第 N 行」角标。**形态边界如实记录：可编辑态是「整区标记 + 行号角标」，逐行高亮依旧只在只读视图** —— spec 只要求「给出可见标记」，故不再假称逐行 | `CodeArea.tsx`；`CodeArea.test.tsx` 新增 3 条（含 `errorOffset` 兜底换算与「无错误时不出现任何标记」） |
+| **W4** 四平台 CI 矩阵未落地 | 新增 `.github/workflows/build.yml`：`verify`（lint / typecheck / test / build，含产物外发扫描）+ `bundle` 四平台矩阵（`macos-14`→dmg arm64、`macos-13`→dmg x64、`windows-latest`→nsis x64、`windows-11-arm`→nsis arm64），带 `concurrency` 取消旧跑批、Rust 缓存与产物上传。**runner 行为本机无法验证**：已用 js-yaml 解析确认结构、矩阵与设计文档 §6.3 逐项一致，首次真实跑批需在 GitHub 上观察（`manual-qa.md` 的 `9.4` 因此仍算未执行） | `.github/workflows/build.yml` |
+| **W5** 五处覆盖缺口 | ① `scripts/scan-egress.mjs` 支持 `SCAN_EGRESS_DIST` 注入 → 新增**脚本级用例**（干净产物 exit 0 / `fetch(` exit 1 并报行号 / 远程 URL 只告警 / 允许清单不计 / 目录缺失 exit 1），并为此加 `scripts` project；② `offline-guard` 补 XHR 拦截、本机放行、控制台提示 3 条；③ 收藏持久化补「模块重载后从 storage 回读」；④ `registry` 校验失败路径补 11 条合成用例；⑤ 死代码 `useToolState.reset()` 接入 `json-diff` 的「清空」（现在会连带抹掉该工具已落盘的快照） | 见 9.3 的新文件清单与新增用例 |
+| **W6** `json-format` 两条断言咬合力弱 | 先钉「确实切到了树形视图」（`aria-pressed`），再断言无 `json-tree` —— 删掉树分支不再能照样绿 | `json-format/Tool.test.tsx` |
+| **S1**（优先 4 项） | UUID 格式开关**组合态**（关连字符 + 开大写）；Markdown「复制 HTML 源码」真正点复制并断言剪贴板内容与「已复制」反馈；新建 `useToolState.test.ts` 直接钉「恢复上次输入」与「状态互不污染」；全局快捷键补「工具输入框内容前后逐字符不变」 | 见 9.3 |
+| **S2** | `\/`（第三类可改写写法）在 `JsonCode` 与 `JsonTree` 两个视图各补一条钉子 | 同上 |
+| **S3 / S4** | 写进 canonical spec（`openspec/specs/dev-tools/spec.md`）：「原文保真只针对**值**，成员名按解码后展示（`\u0041` → `A`）」；「类型标签一一对应」补上「**无重复键**的文档中」这一限定，使 spec 与实现、用例三者一致 | spec 两处逐字修改 |
+| **S6 / S7 / S8** | `token-generator` 的去抖轮询补 `{ timeout: 3000 }`；`roundtrip.test.ts` 的过期注释改为反映主 spec 已含限定词；计划执行记录「其余 22 条」→**23 条**（该文件 24 条 `it`，除剪贴板那条外 23 条不点复制） | 同上 |
+
+### 9.2 本轮新发现
+
+| # | 问题 | 处置 |
+| --- | --- | --- |
+| **W8** | **注册校验对非法 meta 会多报一条自相矛盾的 `orphan-tool`**（「有 Tool.tsx 但缺少 meta.ts」，而它明明有 meta.ts）：`continue` 跳过了「把该目录从孤儿候选里摘掉」那一步。真实目录结构下不可能出现非法 meta，故这条噪声长期无人发现 | 已修：凡该目录的 meta.ts 存在（含导出非对象的分支）都先从 `toolByDirectory` 摘除；`registry.build.test.ts` 用混合场景（合法 + 非法 + 真孤儿）做回归钉子。**这条是新增用例当场咬出来的，不是读代码读出来的** |
+| **W9** | W6 补断言使 `json-format/Tool.test.tsx` 行号位移（+3 / +6），计划覆盖表里 3 处 `文件:行` 引用随之失效 | 已校准（`275→278`、`299→305`、`321→327`）。**本报告 §5 的 W1/W2 证据行号指向修复前的代码，不回改**（那是 `77e1352` 时的快照），以本节为准 |
+| — | `README.md` 的「单测分两个 project」在新增 `scripts` project 后已不成立 | 已改为三个 project 并说明各自环境 |
+
+### 9.3 本轮门禁（控制器实测）
+
+| 命令 | 期望 | 实测 | 退出码 |
+| --- | --- | --- | --- |
+| `npm test` | 全绿 | `Test Files 70 passed (70)`、`Tests 859 passed (859)`（含新增 `registry.build` 12 / `useToolState` 5 / `scan-egress` 5） | 0 |
+| `npm run typecheck` | exit 0 | 无输出 | 0 |
+| `npm run lint` | exit 0 | 无输出 | 0 |
+| `npm run build` | exit 0（含 egress 扫描） | `[scan-egress] 网络 API 调用 0 处；远程 URL 字面量 7 处` + `通过：产物中未发现外发能力。` | 0 |
+| `openspec validate --specs` | 通过 | `7 passed, 0 failed`（S3/S4 改的是主 spec，非 delta） | 0 |
+
+新增测试文件：`src/framework/registry.build.test.ts`、`src/framework/useToolState.test.ts`、`scripts/scan-egress.test.mjs`。
+
+### 9.4 仍未闭合（如实列出）
+
+- **`manual-qa.md` 的 4 条实机验收**（`9.3` 断网冒烟、`9.4` 四平台构建、`9.6` 跨 WebView、`9.10` Windows 前置条件）**仍未执行**，需要真机 / 真断网 / Windows 环境。新加的 CI 只是把 `9.4` 变成「可以在 CI 上做」，**不等于做过** —— 首次跑批结果需回填该文件。
+- **W1/W2 的形态边界**：可编辑输入区是「整区标记 + 行号角标」而非逐行高亮（见 9.1）。
+- **S1 的其余「部分」条目**（`app-shell` 的窗口断点、懒加载证据、Tauri 剪贴板回退分支等）与 **S5**（`image-tools` 的 PNG 落盘 / 复制图片 / 彩色码扫码建议在 `manual-qa.md` 补专用手测项）未逐条处理。
+- **`scan-egress` 的允许清单**目前是 5 条正则的白名单：新增依赖若引入新的合法远程字面量，告警数会上升（不致命），需要人工判断是否入清单。

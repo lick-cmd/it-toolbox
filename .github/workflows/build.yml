@@ -1,0 +1,90 @@
+name: build
+
+# 技术设计 §6.3 承诺的四平台矩阵：macOS(arm64/x64) + Windows(x64/arm64)。
+# 打包产物不签名、不公证（本仓库不申请证书），未注入密钥时产出未签名产物。
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+# 同一分支的旧跑批自动取消，避免排队积压
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: 门禁（lint / typecheck / test / build）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # 仓库根目录带 .npmrc（legacy-peer-deps），npm ci 会读取它
+      - run: npm ci
+
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      # 含 scripts/scan-egress.mjs 的产物外发扫描 —— 离线承诺的第 3 层
+      - run: npm run build
+
+  bundle:
+    name: 打包 ${{ matrix.label }}
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: macOS arm64
+            os: macos-14
+            artifact: dmg-macos-arm64
+          - label: macOS x64
+            os: macos-13
+            artifact: dmg-macos-x64
+          - label: Windows x64
+            os: windows-latest
+            artifact: nsis-windows-x64
+          # windows-11-arm 是 GitHub 的公开预览标签；若该 runner 不可用，
+          # 这一条即整矩阵唯一需要调整的地方（去掉它不影响其余三平台）
+          - label: Windows arm64
+            os: windows-11-arm
+            artifact: nsis-windows-arm64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      # 签名与公证只预留配置位（环境变量注入）。未注入时产物未签名：
+      # macOS 首次启动需右键打开，Windows 无影响。
+      - run: npm run tauri:build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          # 两个路径各自只在对应平台存在，命中其一即可
+          path: |
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+          retention-days: 14
