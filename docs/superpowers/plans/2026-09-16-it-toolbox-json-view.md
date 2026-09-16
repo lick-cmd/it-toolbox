@@ -1553,7 +1553,7 @@ export type { JsonTreeProps } from './JsonTree'
 - [ ] **Step 4: 跑用例确认通过**
 
 Run: `npx vitest run --project ui src/framework/ui/JsonCode.test.tsx`
-Expected: PASS（6 条）。
+Expected: PASS（7 条：既有 6 条 + 桶导出 1 条）。
 
 - [ ] **Step 5: 提交**
 
