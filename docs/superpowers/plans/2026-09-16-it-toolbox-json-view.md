@@ -1019,7 +1019,7 @@ git commit -m "feat(ui): 只读 JSON 视图 JsonCode（token 着色 + 解析失�
 
 **Files:**
 - Modify: `src/app/theme.css`
-- Test: `src/app/theme.test.ts`（新建）
+- Test: `src/app/theme.test.tsx`（新建）
 
 **Interfaces:**
 - Produces: CSS 变量 `--json-key` / `--json-string` / `--json-number` / `--json-literal` / `--json-punct`；样式类 `.json-key`、`.json-object`、`.json-array`、`.json-string`、`.json-number`、`.json-literal`、`.json-punct`、`.json-type`、`.json-tree-toggle`
@@ -1102,7 +1102,7 @@ git commit -m "feat(ui): 只读 JSON 视图 JsonCode（token 着色 + 解析失�
 
 **为什么需要**：本任务没有任何自动化验证 —— 三种最可能的坏法都能让四道门禁全绿：① `var(--json-string)` 引用名拼错（或写成 `--json-strings`）→ 该 token 静默不着色；② 某个类漏写规则 → 那类 token 无色；③ 浅色块漏定义某个变量 → 浅色模式回退成暗色值。**jsdom 不加载外部 CSS，computed style 断言不可靠**，所以钉子只能是「读文件 + 渲染产物对照」。
 
-创建 `src/app/theme.test.ts`：
+创建 `src/app/theme.test.tsx`：
 
 ```ts
 import { readFileSync } from 'node:fs'
@@ -1163,17 +1163,17 @@ describe('theme.css 的 JSON 配色', () => {
 - [ ] **Step 4: 确认样式没写坏既有页面 + 新用例全绿**
 
 Run: `npx vitest run --project ui src/app`
-Expected: PASS（`theme.test.ts` 新用例 + app 层既有用例全绿）。
+Expected: PASS（`theme.test.tsx` 新用例 + app 层既有用例全绿）。
 
 - [ ] **Step 5: 提交**
 
 ```bash
-git add src/app/theme.css src/app/theme.test.ts
+git add src/app/theme.css src/app/theme.test.tsx
 git commit -m "style(theme): JSON 着色变量与树形视图样式（深浅两套）
 
 - --json-* 五个变量同时定义在 :root（暗色默认）与 :root.light，禁止硬编码色值
 - 树形行的缩进与折叠开关样式；折叠开关可点区域与 hover 反馈对齐既有按钮
-- 补 theme.test.ts 钉子：变量双主题齐备、var(--json-*) 引用可解析、组件渲染出的类都有规则"
+- 补 theme.test.tsx 钉子：变量双主题齐备、var(--json-*) 引用可解析、组件渲染出的类都有规则"
 ```
 
 ---
