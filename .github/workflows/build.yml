@@ -47,8 +47,11 @@ jobs:
           - label: macOS arm64
             os: macos-14
             artifact: dmg-macos-arm64
+          # macos-13（Intel）镜像已于 2025-12-04 退役，该标签不再有机器可分配：
+          # job 会一直停在 queued、永不结束，并把下游 release 一起卡死（needs: bundle 要四腿全绿）。
+          # 现改用官方 Intel 标签 macos-15-intel —— 原生 x64 机器，无需交叉编译。
           - label: macOS x64
-            os: macos-13
+            os: macos-15-intel
             artifact: dmg-macos-x64
           - label: Windows x64
             os: windows-latest
@@ -60,6 +63,9 @@ jobs:
             artifact: nsis-windows-arm64
 
     runs-on: ${{ matrix.os }}
+    # 兜底：单 job 默认超时 6 小时，runner 不可用时会把跑批静默拖住半天；
+    # 压到 60 分钟让它明确失败，而不是连带 release job 一起无限等待。
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
