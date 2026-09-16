@@ -47,3 +47,6 @@ coverage/
 # 杂项
 *.tsbuildinfo
 .eslintcache
+.codebuddy/
+docs/
+openspec/
