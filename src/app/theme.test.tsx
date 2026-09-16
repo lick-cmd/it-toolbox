@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createElement } from 'react'
 import { render } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { JsonCode } from '@/framework/ui/JsonCode'
@@ -47,10 +46,7 @@ describe('theme.css 的 JSON 配色', () => {
 
   it('JsonCode 实际渲染出的每个着色类都有规则', () => {
     // 从渲染产物反查，而不是手抄一份类名清单：改组件时这条会自己跟上
-    // 本文件是 `.ts`（任务书指定），oxc 不解析 .ts 内的 JSX，故用 createElement 等价写法
-    const { container } = render(
-      createElement(JsonCode, { value: '{"a":"b","c":1,"d":true,"e":null}' }),
-    )
+    const { container } = render(<JsonCode value={'{"a":"b","c":1,"d":true,"e":null}'} />)
     const used = new Set(
       Array.from(container.querySelectorAll('[data-testid="json-code-line"] span'))
         .map((node) => node.className)
