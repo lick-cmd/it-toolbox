@@ -1106,11 +1106,16 @@ git commit -m "feat(ui): 只读 JSON 视图 JsonCode（token 着色 + 解析失�
 
 ```ts
 import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { render } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { JsonCode } from '@/framework/ui/JsonCode'
 
-const css = readFileSync(new URL('./theme.css', import.meta.url), 'utf8')
+// 相对本文件定位 theme.css。不要写成 `new URL('./theme.css', import.meta.url)`：该字面量
+// 形态会被 Vite 的 asset-import-meta-url 转换静态改写为 dev server 的 http 地址（jsdom 工程
+// 实测得到 http://localhost:3000/src/app/theme.css），readFileSync 会报 scheme file 错误。
+const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'theme.css'), 'utf8')
 const lines = css.split('\n')
 
 /** 取 `:root {` / `:root.light {` 块内文本，收到该块自己的 `}` 为止 */
@@ -1123,8 +1128,10 @@ function blockOf(selector: string): string {
 
 /** 全部「出现在 `{` 之前」的类选择器名 —— 分组选择器（`.a,\n.b {`）也能取到 */
 function declaredClasses(): Set<string> {
+  // `!`：分组一定存在（`([^{}]*)` 允许空串），故 `noUncheckedIndexedAccess` 下的 undefined 不可达；
+  // 与 `src/tools/crypto/ulid-generator/Tool.test.tsx` 的 `match[1]!` 同法。
   const names = [...css.matchAll(/([^{}]*)\{/g)].flatMap((rule) =>
-    [...rule[1].matchAll(/\.(json-[a-z-]+)/g)].map((match) => match[1]),
+    [...rule[1]!.matchAll(/\.(json-[a-z-]+)/g)].map((match) => match[1]!),
   )
   return new Set(names)
 }
@@ -1158,7 +1165,9 @@ describe('theme.css 的 JSON 配色', () => {
 })
 ```
 
-**证明它有牙齿（mutation）**：写完用例跑一遍确认 PASS 后，**临时**把 `theme.css` 里 `.json-number` 那条规则删掉，再跑一次 —— 「JsonCode 实际渲染出的每个着色类都有规则」这条**必须变红**且失败信息点名 `json-number`；随后把 CSS 完整还原（`git diff --stat` 证明零残留）。把这段红输出贴进报告。
+**证明它有牙齿（mutation）**：写完用例跑一遍确认 PASS 后，**临时**把 `theme.css` 里 `.json-number` 那条规则删掉，再跑一次 —— 「JsonCode 实际渲染出的每个着色类都有规则」这条**必须变红**且失败信息点名 `json-number`；随后把 CSS 完整还原并**用 sha256 / blob 哈希复核**（**不要**用 `git checkout -- src/app/theme.css`：此时该文件是未提交改动，checkout 会把 Step 1/2 一起回退）。把这段红输出贴进报告。
+
+已实测的红输出形态（可作期望值）：`AssertionError: theme.css 缺少 .json-number 的规则: expected [ 'json-key', 'json-object', …(7) ] to include 'json-number'` —— 注意这条信息**顺带自证了 `declaredClasses()` 确实取到了分组选择器里的 `json-key`/`json-object`/`json-array`**（否则它们不会出现在这个数组里），即「正则被弱化而静默空转」这一隐患也被间接钉住。
 
 - [ ] **Step 4: 确认样式没写坏既有页面 + 新用例全绿**
 
@@ -1183,6 +1192,7 @@ git commit -m "style(theme): JSON 着色变量与树形视图样式（深浅两�
 **Files:**
 - Create: `src/framework/ui/JsonTree.tsx`
 - Test: `src/framework/ui/JsonTree.test.tsx`
+- Modify: `src/app/theme.test.tsx`（补 JsonTree 侧的着色类对照断言）
 
 **Interfaces:**
 - Consumes: `JsonTreeModel`、`buildJsonTree`、`visibleRows`、`collapseAllPaths`、`isContainer`、`keyText`、`valueText`、`TREE_MAX_VISIBLE_ROWS`（`@/core/json/tree`）
@@ -1298,6 +1308,7 @@ import {
   keyText,
   valueText,
   visibleRows,
+  type JsonTreeNode,
   type JsonTreeModel,
 } from '@/core/json/tree'
 
@@ -1309,6 +1320,26 @@ export interface JsonTreeProps {
 }
 
 const BUTTON = 'h-6 rounded-sm border border-border bg-surface-2 px-2 text-[12px] hover:border-accent'
+
+/**
+ * 值类型 → 着色类名。
+ *
+ * 与 `JsonCode` 的 `KIND_CLASS` 同口径，且这里**必须**显式映射、不能写 `` `json-${node.type}` ``：
+ * 树的值类型来自 `type-hints` 的 `JsonValueType`，比 scanner 的 token 类别更细 —— 字面量在
+ * 那里叫 `literal`（`true`/`false`/`null` 共一类），在树里却分成 `boolean` 与 `null` 两项。
+ * 直接拼类名会渲染出 `theme.css` 里根本没有的 `.json-boolean` / `.json-null`，结果是这两个
+ * 值在树视图里**静默不着色**（与源码视图不一致），而所有文本断言都照样通过。
+ * `absent` 不可达（树只从解析成功的 token 流构建），兜到同一类名只为不造出无规则的类名。
+ */
+const TYPE_CLASS: Record<JsonTreeNode['type'], string> = {
+  object: 'json-object',
+  array: 'json-array',
+  string: 'json-string',
+  number: 'json-number',
+  boolean: 'json-literal',
+  null: 'json-literal',
+  absent: 'json-literal',
+}
 
 /**
  * 可折叠的 JSON 树。
@@ -1394,7 +1425,7 @@ export function JsonTree({ tree, label, maxRows }: JsonTreeProps) {
               <span className="json-tree-toggle" aria-hidden="true" />
             )}
             <span className="json-key">{keyText(node)}</span>
-            <span className={`json-${node.type}`}>{valueText(node, expanded)}</span>
+            <span className={TYPE_CLASS[node.type]}>{valueText(node, expanded)}</span>
             <span className="json-type">{node.label}</span>
           </li>
         ))}
@@ -1409,15 +1440,56 @@ export function JsonTree({ tree, label, maxRows }: JsonTreeProps) {
 Run: `npx vitest run --project ui src/framework/ui/JsonTree.test.tsx`
 Expected: PASS（7 条）。
 
-- [ ] **Step 5: 提交**
+- [ ] **Step 5: 在 `src/app/theme.test.tsx` 补 JsonTree 侧的着色类对照断言**
+
+**为什么需要**：Task 4 的钉子只反查了 `JsonCode` 渲染出的类，于是 `.json-object` / `.json-array` / `.json-type` / `.json-tree-row` / `.json-tree-toggle` 这 5 个类**当时没有消费方、验证不了**；而树视图恰恰是它们唯一的消费方。这条断言顺带兜住本任务最容易犯的错 —— 见 Step 3 里 `TYPE_CLASS` 的注释：把值类型直接拼进类名会造出 `theme.css` 里不存在的 `.json-boolean` / `.json-null`，那两个值静默不着色，而所有文本断言照样全绿。
+
+在 `src/app/theme.test.tsx` 的 `describe` 内追加：
+
+```tsx
+  it('JsonTree 实际渲染出的每个着色类都有规则', () => {
+    // 树的值类型（boolean/null）比 token 类别（literal）更细，若组件直接把 node.type 拼进
+    // 类名，就会渲染出 theme.css 里没有的 .json-boolean / .json-null —— 那两个值静默不着色。
+    const built = buildJsonTree('{"s":"x","n":1,"b":true,"z":null,"o":{},"a":[]}')
+    if (!built.ok) throw new Error(built.error)
+    // 这份输入一次覆盖树会用到的全部 9 个类：根 object、空数组 array、四类标量、
+    // 类型标签、行与折叠开关（空容器不给开关，故开关类由根提供）
+    const { container } = render(<JsonTree tree={built.value} />)
+    const used = new Set(
+      Array.from(
+        container.querySelectorAll('[data-testid="json-tree-row"], [data-testid="json-tree-row"] *'),
+      )
+        .map((node) => node.className)
+        .filter((name) => name.startsWith('json-')),
+    )
+    // 写死 9：把「组件实际用到的类清单」与 Task 4 的 Produces 钉在一起。
+    // 少了就说明组件拼错了类名（漏类不会让这条退化成只检查「渲染出的类都有规则」）
+    expect(used).toHaveLength(9)
+    for (const name of used) expect(declaredClasses(), `theme.css 缺少 .${name} 的规则`).toContain(name)
+  })
+```
+
+同时在文件顶部补两条 import：
+
+```tsx
+import { buildJsonTree } from '@/core/json/tree'
+import { JsonTree } from '@/framework/ui/JsonTree'
+```
+
+**证明它有牙齿（mutation）**：把 `JsonTree.tsx` 里 `boolean: 'json-literal'` 临时改回 `'json-boolean'`（即复现本任务原先那种「直接拼类名」的写法），跑 `npx vitest run --project ui src/app` —— 这条**必须变红**，失败信息应直指类名（`theme.css 缺少 .json-boolean 的规则`，以及 `used` 变成 10 个而期望 9）；随后完整还原（**用 sha256 / blob 哈希复核，不要用 `git checkout`** —— 该文件此时是未提交改动，checkout 会把整个实现一起回退）。把红输出贴进报告。
+
+- [ ] **Step 6: 提交**
 
 ```bash
-git add src/framework/ui/JsonTree.tsx src/framework/ui/JsonTree.test.tsx
+git add src/framework/ui/JsonTree.tsx src/framework/ui/JsonTree.test.tsx src/app/theme.test.tsx
 git commit -m "feat(ui): 可折叠 JSON 树（逐个折叠 + 摘要 + 全部展开折叠）
 
 - 折叠状态是 JSONPath 集合，按节点独立；文档换了才回到默认折叠态
 - 只渲染展开路径上的行，超过上限如实提示，不静默截断
-- 折叠开关带 aria-expanded 且可键盘触发；空容器不给开关（没有可折叠的内容）"
+- 折叠开关带 aria-expanded 且可键盘触发；空容器不给开关（没有可折叠的内容）
+- 值类型经 TYPE_CLASS 显式映射到着色类：boolean/null 与源码视图共用 json-literal，
+  不直接拼接 json-node.type，否则会渲染出 theme.css 里没有的 .json-boolean / .json-null
+- theme.test.tsx 补 JsonTree 侧对照断言，把 9 个类的类名清单钉住"
 ```
 
 ---
