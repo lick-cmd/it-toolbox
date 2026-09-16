@@ -2935,6 +2935,21 @@ git commit -m "feat(crypto): 实现 ULID 生成器工具（5.9）
 
 - [ ] **Step 1: 写失败的界面测试**
 
+> **执行期修正（2026-09-16）**：用例数 **7 → 8**（评审补 1 条竞态用例），抓到 2 处测试缺陷：
+> 1. **jest-dom 匹配器（同 T7/T8，第三次复发）**：`toHaveTextContent` ×2 + `toBeInTheDocument` ×1，仓库未安装 `@testing-library/jest-dom` ⇒ 必然 `Invalid Chai property`。按既有约定改写。
+> 2. **「未填密钥」用例写成同步断言**：计算是异步的（`crypto.subtle` 返回 Promise），首帧不可能已有结果。用探针实测确认：计划原版写法报 `TestingLibraryError: Unable to find an accessible element with the role "alert"`。改为 `async` + `waitFor`，并在同一用例里补「异步返回前的一帧是空态」的同步断言 —— 否则 `EmptyState` 分支无人覆盖（与 T8 评审 I-2 同类漏杀；实测变异「删掉空态分支」被杀）。
+> 3. **按 spec 加严两处断言**：spec「输出格式切换」要求「**同一输入产生相同摘要的不同编码表示，且可相互还原**」⇒ 把该用例扩成往返断言（hex → base64url → hex 必须回到同一摘要），用例数不变；Base64URL 的断言由「无 `=`、无 `+`/`/`」加严为 `/^[A-Za-z0-9_-]{43}$/`（SHA-256 的 32 字节 ⇒ 恰 43 字符），否则「实现误返回 hex」这类同形错误会漏杀。
+> 4. **实现侧主动加固**：`computeHmac` 正常失败走 `Result` 而不抛错，真抛了（例如运行环境缺 `subtle`）原代码会留下未处理的 rejection、输出区永远停在空态 ⇒ 补 `try/catch` 并显示原因，与 Token / ULID 工具同一策略。
+> 5. 门禁口径：本任务后我的范围为 **36 文件 / 402 用例**（395 + 7）。同刻全量的 1 文件失败与 1 条类型错误**均在并行工作流的 `src/core/image/qrcode.*`**（与本计划无关；已核对全项目类型错误共 1 条且不在我方文件）。
+> 6. **评审反馈（3 项成立并闭环、1 项附证据驳回、1 项升格采纳）**：
+>    - **驳回「HMAC 密钥落盘」（附规范证据）**：`tool-registry/spec.md:181` 明确 SHALL 保存「输入、**参数与选项**」，`:188-191` 的 Scenario 更直接以「HMAC 算法」举例 ⇒ 用户输入的参数本就在持久化范围内。本计划 Task 10 的「密钥材料不落盘」针对的是**生成的密钥对（输出）**，与用户输入参数不是一回事。故保留 `key` 持久化，不私自偏离规范；若日后认为用户机密不应落盘，应作为一条跨工具的规范调整，而不是在单个工具内偷偷偏离。
+>    - **漏杀（状态行位数）闭环**：`DIGEST_BITS[algorithm]` 写死 `256` 原本无人能杀 ⇒ SHA-512 用例补状态行断言。变异实测 **杀**。
+>    - **关键属性无覆盖闭环（新增 1 条用例）**：「过期结果守卫」是本工具最核心的并发正确性，但需要可控挂起才能验证 ⇒ 引入与 Task 10 同款的 `vi.hoisted` + `vi.mock`（默认透传真实 core）并新增竞态用例「后发先至，旧结果必须被丢弃」。变异实测：删掉守卫 **杀**。
+>    - **判为行为等价变异**：删掉错误分支里的 `setDigest(null)` 后 8 条仍全绿 —— 错误分支在渲染上优先于摘要分支，残留摘要根本不可见（实测确认）。但按评审提示把该用例改成「先有摘要 → 再报错」的路径，额外钉住「错误必须盖住旧摘要」这一用户可见属性（变异「删掉错误分支」实测被杀）。
+>    - **Minor 升格采纳（真漏杀）**：原用例只证明「64 位十六进制」，**把 `key` 与 `message` 传反也能通过** ⇒ 补已知答案向量（`HMAC-SHA256(secret, hello)`，由 node 独立算出）。变异实测：传反 **杀**（2 条用例失败）。
+>    - 首帧即红（评审建议归空态）**判定不成立**：spec 的「密钥为空」Scenario 要求「提示密钥不可为空」，首帧无密钥 ⇒ 提示正是规范行为。其余 Minor 接受：错误态丢失算法信息与 token-generator 同构；`DIGEST_BITS` 是穷尽 `Record`，core 新增算法会编译报错。评审提出的 Base64URL 残余同形风险（位置/位分组错误）不补：需自写 base64url 解码器，编码正确性属核心测试职责（`hmac.test.ts` 已覆盖）。
+>    - 计划下游累计值同步：本任务 **392 → 393**、Task 10 **401 → 402**。
+
 创建 `src/tools/crypto/hmac-generator/Tool.test.tsx`：
 
 ```tsx
@@ -3260,7 +3275,7 @@ Expected: PASS，7 个用例全绿
 
 Run: `npm test > .superpowers/sdd/2026-09-15-it-toolbox-foundation/p02-t9-all.log 2>&1; echo "test=$?"; npm run typecheck > /dev/null 2>&1; echo "tc=$?"; npm run lint > /dev/null 2>&1; echo "lint=$?"; grep -aE "Test Files|Tests " .superpowers/sdd/2026-09-15-it-toolbox-foundation/p02-t9-all.log | tail -2`
 
-Expected: `test=0 tc=0 lint=0`，用例总数为 **385 + 7 = 392**
+Expected: `test=0 tc=0 lint=0`，用例总数为 **385 + 8 = 393**（评审补 1 条竞态用例，见上方执行期修正第 6 条）
 
 - [ ] **Step 6: 提交**
 
@@ -3767,7 +3782,7 @@ Expected: PASS，9 个用例全绿（RSA 8 + Button 1）
 
 Run: `npm test > .superpowers/sdd/2026-09-15-it-toolbox-foundation/p02-t10-all.log 2>&1; echo "test=$?"; npm run typecheck > /dev/null 2>&1; echo "tc=$?"; npm run lint > /dev/null 2>&1; echo "lint=$?"; grep -aE "Test Files|Tests " .superpowers/sdd/2026-09-15-it-toolbox-foundation/p02-t10-all.log | tail -2`
 
-Expected: `test=0 tc=0 lint=0`，用例总数为 **392 + 9 = 401**
+Expected: `test=0 tc=0 lint=0`，用例总数为 **393 + 9 = 402**
 
 - [ ] **Step 7: 提交**
 
