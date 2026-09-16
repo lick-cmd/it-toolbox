@@ -1952,7 +1952,10 @@ git commit -m "test(tools): 钉住树形与源码逐字符一致、复制不受�
 - [ ] **Step 2: 跑全量门禁**
 
 ```bash
-npm test          # 期望：全绿，文件数 63 → 66（tree / JsonCode / JsonTree 三个新用例文件）
+npm test          # 期望：全绿，67 文件 / 820 条（基线 63 文件；本次新增 4 个用例文件：
+                  #   core/json/tree.test.ts、framework/ui/JsonCode.test.tsx、
+                  #   app/theme.test.ts、framework/ui/JsonTree.test.tsx。
+                  #   用例总数 812 → 820：树视图 4 条 → 816、折叠重置 2 条 → 818、不变量 2 条 → 820）
 npm run typecheck # 期望：exit 0
 npm run lint      # 期望：exit 0
 npm run build     # 期望：exit 0（含 scripts/scan-egress.mjs 产物扫描）
