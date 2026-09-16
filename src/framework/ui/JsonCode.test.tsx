@@ -1,6 +1,8 @@
 import { render } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { buildJsonTree } from '@/core/json/tree'
 import { JsonCode } from './JsonCode'
+import { JsonCode as JsonCodeFromBarrel, JsonTree as JsonTreeFromBarrel } from './index'
 
 /** 内容列按行取出 —— 行号列不能混进来，否则「与原文相等」无从验证 */
 function linesOf(container: HTMLElement): string[] {
@@ -61,5 +63,17 @@ describe('JsonCode', () => {
   it('空内容显示空态', () => {
     const { container } = render(<JsonCode value="" />)
     expect(container.textContent).toContain('（空）')
+  })
+})
+
+describe('framework/ui 桶导出', () => {
+  it('两个新原语都能从 index 导入并渲染', () => {
+    const { container } = render(<JsonCodeFromBarrel value={'{"a":1}'} />)
+    expect(container.querySelector('.json-number')).toBeTruthy()
+
+    const built = buildJsonTree('{"a":1}')
+    if (!built.ok) throw new Error(built.error)
+    render(<JsonTreeFromBarrel tree={built.value} />)
+    expect(document.querySelector('[data-testid="json-tree"]')).toBeTruthy()
   })
 })
