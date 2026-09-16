@@ -39,6 +39,12 @@
   --app-danger: #ff6b6b;
   --app-success: #3ddc97;
   --app-warn: #ffc857;
+  /* JSON 着色：语义对齐 VS Code 暗色主题，深浅两套各自取可读值 */
+  --json-key: #9cdcfe;
+  --json-string: #ce9178;
+  --json-number: #b5cea8;
+  --json-literal: #569cd6;
+  --json-punct: var(--app-muted);
 }
 
 :root.light {
@@ -53,6 +59,11 @@
   --app-danger: #d92d20;
   --app-success: #067647;
   --app-warn: #b54708;
+  --json-key: #0451a5;
+  --json-string: #a31515;
+  --json-number: #098658;
+  --json-literal: #0000ff;
+  --json-punct: #6b7280;
 }
 
 html,
@@ -187,4 +198,51 @@ body {
 .md-preview .md-link-url {
   color: var(--app-muted);
   font-size: 12px;
+}
+
+/* JSON 着色与树形视图 */
+.json-key,
+.json-object,
+.json-array {
+  color: var(--json-key);
+}
+
+.json-string {
+  color: var(--json-string);
+}
+
+.json-number {
+  color: var(--json-number);
+}
+
+.json-literal {
+  color: var(--json-literal);
+}
+
+.json-punct {
+  color: var(--json-punct);
+}
+
+.json-type {
+  color: var(--app-muted);
+  font-size: 11px;
+}
+
+.json-tree-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding-right: 10px;
+}
+
+.json-tree-toggle {
+  width: 12px;
+  flex: none;
+  color: var(--app-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.json-tree-toggle:hover {
+  color: var(--app-fg);
 }
