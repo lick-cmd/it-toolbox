@@ -30,6 +30,17 @@ describe('sanitizeXmlName', () => {
   it('空键变成下划线', () => {
     expect(sanitizeXmlName('')).toBe('_')
   })
+
+  it('组合附标 #x0300–#x036F 保留（与 brief 的字面区间语义一致）', () => {
+    expect(sanitizeXmlName('e\u0301')).toBe('e\u0301')
+    expect(sanitizeXmlName('a\u0300')).toBe('a\u0300')
+    expect(sanitizeXmlName('z\u036f')).toBe('z\u036f')
+  })
+
+  it('不在 #x0300–#x036F 内的标记仍净化（不放宽成任意 Unicode 标记）', () => {
+    // U+0903 是通用 Unicode 组合标记，但不属 XML NameChar 允许的 #x0300–#x036F
+    expect(sanitizeXmlName('a\u0903')).toBe('a_')
+  })
 })
 
 describe('jsonToXml', () => {
@@ -59,12 +70,46 @@ describe('jsonToXml', () => {
     )
   })
 
+  it('顶层数组内部的嵌套数组沿用用户 wrap 语义（同名元素重复），不因根是数组被传染', () => {
+    expect(xmlOf('[{"tags":["a","b"]}]')).toBe(
+      [
+        DOC,
+        '<root>',
+        '  <item>',
+        '    <tags>a</tags>',
+        '    <tags>b</tags>',
+        '  </item>',
+        '</root>',
+      ].join('\n'),
+    )
+  })
+
+  it('顶层空数组仍是单个自闭合根元素', () => {
+    expect(xmlOf('[]')).toBe(`${DOC}\n<root/>`)
+  })
+
   it('null 写成自闭合，空字符串写成成对空元素（刻意区分）', () => {
     expect(xmlOf('{"none":null,"empty":""}')).toContain('  <none/>\n  <empty></empty>')
   })
 
   it('文本转义 & < >，回车转成字符引用', () => {
     expect(xmlOf('{"a":"x&y<z>w\\r"}')).toContain('<a>x&amp;y&lt;z&gt;w&#13;</a>')
+  })
+
+  it('XML 1.0 不可表示的字符替换为 U+FFFD（不丢弃、不报错）', () => {
+    expect(xmlOf('{"a":"\\u0001"}')).toContain('<a>\uFFFD</a>')
+    expect(xmlOf('{"a":"\\u001f"}')).toContain('<a>\uFFFD</a>')
+    expect(xmlOf('{"a":"\\ud800"}')).toContain('<a>\uFFFD</a>')
+    expect(xmlOf('{"a":"\\ufffe"}')).toContain('<a>\uFFFD</a>')
+  })
+
+  it('配对的代理对是合法星平面字符，不被误伤', () => {
+    expect(xmlOf('{"a":"\\ud83d\\ude00"}')).toContain('<a>\u{1F600}</a>')
+  })
+
+  it('XML 1.0 合法的 TAB / LF 原样保留，CR 仍写成字符引用', () => {
+    expect(xmlOf('{"a":"\\t\\n"}')).toContain('<a>\t\n</a>')
+    expect(xmlOf('{"a":"\\r"}')).toContain('<a>&#13;</a>')
   })
 
   it('元素名净化', () => {
