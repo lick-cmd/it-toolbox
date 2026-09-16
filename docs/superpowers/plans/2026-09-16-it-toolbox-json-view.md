@@ -1600,7 +1600,7 @@ git commit -m "feat(ui): 从 framework/ui 导出 JsonCode 与 JsonTree
 - [ ] **Step 1: 先跑四个工具的现有用例，记下会因「文本被拆成多个 span」而失败的断言**
 
 Run: `npx vitest run --project ui src/tools/dev/json-minify src/tools/converter/yaml-to-json src/tools/web/jwt-parser`
-Expected: 部分用例 FAIL，典型形态是 `Unable to find an element with the text: {"a":1}`（整行原本是一个文本节点，现在被 token 切成多个 `<span>`）。
+Expected: 全绿（此刻四处输出仍是 `CodeArea`，文本尚未被切分）。本任务的 RED 出现在**源码替换之后**：先跑出基线绿 → 替换组件 → 跑出红（典型形态是 `Unable to find an element with the text: {"alg": "HS256",`，整行原本是一个文本节点、现在被 token 切成多个 `<span>`）→ 修断言 → 再跑出绿。
 
 - [ ] **Step 2: 逐处改造并修正断言**
 
