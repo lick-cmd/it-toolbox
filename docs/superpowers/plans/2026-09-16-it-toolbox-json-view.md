@@ -1234,7 +1234,7 @@ describe('JsonTree', () => {
 
     await user.click(screen.getByRole('button', { name: '折叠 $.a' }))
 
-    expect(rowTexts()).toHaveLength(2) // $ 、$.a
+    expect(rowTexts()).toHaveLength(3) // $ 、$.a（折叠态）、$.d（同级不受折叠影响，仍在）
     expect(screen.getByText('{…} 2 键')).toBeTruthy()
     expect(screen.getByRole('button', { name: '展开 $.a' }).getAttribute('aria-expanded')).toBe('false')
   })
@@ -1247,8 +1247,8 @@ describe('JsonTree', () => {
     await user.click(screen.getByRole('button', { name: '折叠 $.c' }))
     await user.click(screen.getByRole('button', { name: '展开 $.a' }))
 
-    expect(screen.getByRole('button', { name: '折叠 $.c' }).getAttribute('aria-expanded')).toBe('false')
-    expect(screen.getByRole('button', { name: '展开 $.a' }).getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByRole('button', { name: '展开 $.c' }).getAttribute('aria-expanded')).toBe('false')
+    expect(screen.getByRole('button', { name: '折叠 $.a' }).getAttribute('aria-expanded')).toBe('true')
   })
 
   it('全部折叠后除根以外全部收起，全部展开后恢复', async () => {
