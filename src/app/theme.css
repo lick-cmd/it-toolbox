@@ -235,7 +235,9 @@ body {
   padding-right: 10px;
 }
 
-.json-tree-toggle {
+/* 树形视图与代码视图的折叠开关：同一形态（固定 12px 占位）在两处复用 */
+.json-tree-toggle,
+.json-fold-toggle {
   width: 12px;
   flex: none;
   color: var(--app-muted);
@@ -243,6 +245,7 @@ body {
   line-height: 1.4;
 }
 
-.json-tree-toggle:hover {
+.json-tree-toggle:hover,
+.json-fold-toggle:hover {
   color: var(--app-fg);
 }

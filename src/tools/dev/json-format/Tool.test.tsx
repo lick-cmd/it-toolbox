@@ -227,6 +227,70 @@ describe('JSON 美化 —— 大体积输入', () => {
   }, 30000)
 })
 
+describe('JSON 美化 —— 格式化结果折叠', () => {
+  /** 折叠后行号会跳号，故这里只按内容列取行，不照搬只读视图的 `lines()` */
+  const lineTexts = () =>
+    Array.from(document.querySelectorAll('[data-testid="json-code-line"]')).map(
+      (node) => node.textContent ?? '',
+    )
+
+  it('折叠某行后其内容行消失并给出摘要，行号仍按原文', async () => {
+    const user = userEvent.setup()
+    render(<JsonFormatTool />)
+    setInput('{"a":{"b":1,"c":2},"d":3}')
+
+    expect(lineTexts()).toEqual(['{', '  "a": {', '    "b": 1,', '    "c": 2', '  },', '  "d": 3', '}'])
+
+    await user.click(screen.getByRole('button', { name: '折叠 第 2 行' }))
+
+    expect(lineTexts()).toEqual(['{', '  "a": {', '  "d": 3', '}'])
+    expect(screen.getByText('… 2 键')).toBeTruthy()
+    expect(
+      Array.from(document.querySelectorAll('li')).map((row) => row.firstElementChild?.textContent),
+    ).toEqual(['1', '2', '6', '7'])
+  })
+
+  it('全部折叠后只剩各层开括号，全部展开恢复', async () => {
+    const user = userEvent.setup()
+    render(<JsonFormatTool />)
+    setInput('{"a":{"b":1,"c":2},"d":3}')
+
+    await user.click(screen.getByRole('button', { name: '全部折叠' }))
+    expect(lineTexts()).toEqual(['{', '  "a": {', '  "d": 3', '}'])
+
+    await user.click(screen.getByRole('button', { name: '全部展开' }))
+    expect(lineTexts()).toHaveLength(7)
+  })
+
+  it('折叠只影响展示：复制与下载拿到的仍是完整格式化原文', async () => {
+    const user = userEvent.setup()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+
+    render(<JsonFormatTool />)
+    setInput('{"a":{"b":1,"c":2}}')
+    await user.click(screen.getByRole('button', { name: '全部折叠' }))
+    await user.click(screen.getByRole('button', { name: '复制' }))
+    await user.click(screen.getByRole('button', { name: '下载' }))
+
+    const complete = '{\n  "a": {\n    "b": 1,\n    "c": 2\n  }\n}'
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith(complete))
+    const [, text] = fileMocks.downloadText.mock.calls[0] ?? []
+    expect(String(text)).toBe(complete)
+  })
+
+  it('预览被截断时不提供折叠，并在提示里说明', () => {
+    // 800 个元素按 2 空格美化后是 2402 行（每项 3 行、外加首尾两行），越过 2000 行预览上限；
+    // 输入仅约 8KB，不触发大输入延迟路径，用例不必等
+    render(<JsonFormatTool />)
+    setInput(JSON.stringify(Array.from({ length: 800 }, (_, index) => ({ id: index }))))
+
+    expect(screen.getByText(/预览仅显示前 2000 行/)).toBeDefined()
+    expect(screen.getByText(/也不提供折叠/)).toBeDefined()
+    expect(screen.queryByTestId('json-code-fold-bar')).toBeNull()
+  })
+})
+
 describe('JSON 美化 —— 只读视图由框架层着色', () => {
   it('输出区由框架层着色视图呈现', () => {
     render(<JsonFormatTool />)

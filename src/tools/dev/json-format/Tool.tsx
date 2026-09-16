@@ -235,11 +235,11 @@ export default function JsonFormatTool() {
                 {preview !== null && preview.total > MAX_PREVIEW_ROWS && (
                   <p className="border-b border-border bg-surface-2 px-2.5 py-1.5 text-[12px] text-warn">
                     输出共 {preview.total} 行，预览仅显示前 {MAX_PREVIEW_ROWS} 行；
-                    预览内容不完整，因此不参与语法着色（着色需要完整合法的 JSON）；
-                    复制与下载给的是完整内容。
+                    预览内容不完整，因此不参与语法着色、也不提供折叠（两者都要求预览是一份完整合法的
+                    JSON）；复制与下载给的是完整内容。
                   </p>
                 )}
-                <JsonCode value={preview?.text ?? ''} label="格式化结果" />
+                <JsonCode value={preview?.text ?? ''} label="格式化结果" foldable />
               </>
             )}
           </>
