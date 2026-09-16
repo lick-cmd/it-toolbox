@@ -14,6 +14,10 @@ import {
  *
  * 与写入器互校才有意义：用写入器自己验证自己只能证明「两次都错成一样」。
  * 这里的实现刻意不复用 der.ts 的任何函数。
+ *
+ * 边界说明：`readIntegerValue` 的剥零逻辑与 `derInteger` 同构，因此它对「INTEGER 规范化」
+ * **不构成独立证据** —— 那一层的兜底是下面直接写死十六进制字面量的断言（如 `02020102`）。
+ * 读取器的价值在于互校 TLV 框架（标签 / 长度形式 / 嵌套偏移）。
  */
 interface Tlv {
   tag: number
@@ -74,6 +78,8 @@ describe('derLength', () => {
     expect(toHex(derLength(0x100))).toBe('820100')
     expect(toHex(derLength(70_000))).toBe('83011170')
     expect(toHex(derLength(0x10000))).toBe('83010000')
+    // 2^32 需要 5 个长度字节：任何「最多 4 字节」的截断都会在这里暴露
+    expect(toHex(derLength(0x1_0000_0000))).toBe('850100000000')
   })
 
   it('非整数或负数抛 RangeError', () => {
@@ -156,6 +162,25 @@ describe('独立读取器互校', () => {
     const second = readTlv(outer.value, first.next)
     expect(second.tag).toBe(0x02)
     expect(toHex(readIntegerValue(outer.value, first.next))).toBe('010001')
+  })
+
+  it('长形式长度（≥ 0x80）也能被独立读取器跨过', () => {
+    // 上面的用例全部落在短形式长度上，长形式的解析路径需要单独走一遍：
+    // 200 字节负载 ⇒ INTEGER 内容 200（长形式 0x81c8），SEQUENCE 内容 203（长形式 0x81cb）。
+    const payload = new Uint8Array(200).fill(0x41)
+    const der = derSequence([derInteger(payload)])
+
+    const outer = readTlv(der)
+    expect(outer.tag).toBe(0x30)
+    expect(outer.value.length).toBe(203)
+    expect(outer.next).toBe(der.length)
+
+    const inner = readTlv(outer.value, 0)
+    expect(inner.tag).toBe(0x02)
+    expect(inner.value.length).toBe(200)
+    expect(inner.value[0]).toBe(0x41)
+    expect(inner.value[199]).toBe(0x41)
+    expect(inner.next).toBe(203)
   })
 })
 

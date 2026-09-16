@@ -3,8 +3,10 @@ import { bytesToBase64 } from './bytes'
 /**
  * DER 最小写入器。
  *
- * 只服务 RSA 的 PKCS#1 导出与 OpenSSH 公钥组装 —— 由 JWK 拿到全部 CRT 参数后正向
- * 组装，因此完全不需要 DER 解析器（设计文档 §3.5）。零新增依赖。
+ * 服务 RSA 的四种导出：PKCS#1（`derInteger` / `derSequence`）、SPKI 与 PKCS#8
+ * （`derInteger` / `derSequence` / `derBitString` / `derNull`——公钥要包成 BIT STRING，
+ * AlgorithmIdentifier 的 parameters 是 NULL）、以及 OpenSSH 单行公钥。由 JWK 拿到全部
+ * CRT 参数后**正向组装**，因此完全不需要 DER 解析器（设计文档 §3.5）。零新增依赖。
  */
 
 /** 长度编码：< 0x80 用短形式；否则 0x80 | 字节数 + 大端长度。 */

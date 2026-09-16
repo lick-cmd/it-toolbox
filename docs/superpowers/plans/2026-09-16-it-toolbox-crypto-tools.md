@@ -1095,9 +1095,15 @@ git commit -m "feat(crypto): 实现 HMAC 计算 Core（5.4）
 
 - [ ] **Step 1: 写失败测试**
 
-> **执行期预检修正（2026-09-16）**：下面两处是**计划自身的缺陷**，落地前用外部工具取证后修正：
+> **执行期修正（2026-09-16，预检 2 处 + 评审 3 处）**。前两处是**计划自身的缺陷**，落地前用外部工具取证后修正：
 > 1. 测试里 `derInteger(fromHex('00000102'))` 期望 `02030102` —— 与计划自己的实现矛盾：`derInteger` 剥离**全部**前导零（X.690 §8.3.2 的要求），值 258 的规范编码是 `02020102`。openssl 实测：`02 02 01 02` → `INTEGER :0102`（合法）、`02 03 00 01 02` → **`BAD INTEGER:[000102]`**（非规范编码），且 `openssl asn1parse -genstr "INTEGER:0x0102"` 输出的就是 `02020102`。已按 `02020102` 落地（`02030102` 会写出 openssl 拒绝的 DER）。
 > 2. 测试里的 `derInteger(new Uint8Array(0))` 期望 `020100`，而计划的实现会给出 `0200`。**测试是对的**：DER 要求 INTEGER 至少有一个内容字节 —— openssl 实测 `02 00` → `BAD INTEGER:[]`、`02 01 00` → `INTEGER :00` ⇒ 实现补上「空输入按零值编码」分支。
+>
+> 评审后追加三处（**用例数 16 → 17**，累计期望值已同步）：
+> 3. **补「长形式长度也能被独立读取器跨过」用例**：原互校用例只含短形式长度，读取器的长形式解析路径（`count = first & 0x7f` + 大端拼装）从未被走过 ⇒ 补一条 200 字节负载的嵌套结构。
+> 4. **`derLength` 补 2^32 断言**：原最大用例是 70_000（3 字节长度），5 字节长度路径无覆盖。变异「长度字节最多 4 个」实测被这条**恰好杀死**（`多位长度用大端`）。
+> 5. **注释校正**：① `der.ts` 顶部原称「只服务 PKCS#1 导出与 OpenSSH 组装」，但 `derBitString` / `derNull` 属 SPKI / PKCS#8 ⇒ 改为列出四种导出；② 测试里 `readIntegerValue` 的剥零逻辑与 `derInteger` 同构，**对 INTEGER 规范化不构成独立证据**（该层兜底是直接写死的十六进制字面量断言），已在注释里写明，避免把它当成互校证据。
+> 6. **评审的一条 Minor 被实测证伪**：评审（无 shell 环境）称 `openssl asn1parse` 默认不会拒绝 `02 03 00 01 02`；实跑输出为 `BAD INTEGER:[000102]`，故上面第 1 条的结论与测试注释保持不变。
 
 创建 `src/core/der.test.ts`：
 
@@ -1380,13 +1386,13 @@ export function bytesToPem(bytes: Uint8Array, label: string): string {
 
 Run: `npx vitest run --project core src/core/der.test.ts > .superpowers/sdd/2026-09-15-it-toolbox-foundation/p02-t4-pass.log 2>&1; echo "exit=$?"; tail -20 .superpowers/sdd/2026-09-15-it-toolbox-foundation/p02-t4-pass.log`
 
-Expected: PASS，16 个用例全绿，`exit=0`
+Expected: PASS，17 个用例全绿，`exit=0`
 
 - [ ] **Step 5: 跑门禁**
 
 Run: `npm test > .superpowers/sdd/2026-09-15-it-toolbox-foundation/p02-t4-all.log 2>&1; echo "test=$?"; npm run typecheck > /dev/null 2>&1; echo "tc=$?"; npm run lint > /dev/null 2>&1; echo "lint=$?"; grep -aE "Test Files|Tests " .superpowers/sdd/2026-09-15-it-toolbox-foundation/p02-t4-all.log | tail -2`
 
-Expected: `test=0 tc=0 lint=0`，用例总数为 **337 + 16 = 353**
+Expected: `test=0 tc=0 lint=0`，用例总数为 **337 + 17 = 354**
 
 - [ ] **Step 6: 提交**
 
@@ -1610,7 +1616,7 @@ Expected: PASS，7 个用例全绿，`exit=0`
 
 Run: `npm test > .superpowers/sdd/2026-09-15-it-toolbox-foundation/p02-t5-all.log 2>&1; echo "test=$?"; npm run typecheck > /dev/null 2>&1; echo "tc=$?"; npm run lint > /dev/null 2>&1; echo "lint=$?"; grep -aE "Test Files|Tests " .superpowers/sdd/2026-09-15-it-toolbox-foundation/p02-t5-all.log | tail -2`
 
-Expected: `test=0 tc=0 lint=0`，用例总数为 **353 + 7 = 360**
+Expected: `test=0 tc=0 lint=0`，用例总数为 **354 + 7 = 361**
 
 - [ ] **Step 6: 提交**
 
@@ -2127,7 +2133,7 @@ Expected: PASS，9 个用例全绿（其中 openssl 用例在缺失 openssl 时�
 
 Run: `npm test > .superpowers/sdd/2026-09-15-it-toolbox-foundation/p02-t6-all.log 2>&1; echo "test=$?"; npm run typecheck > /dev/null 2>&1; echo "tc=$?"; npm run lint > /dev/null 2>&1; echo "lint=$?"; grep -aE "Test Files|Tests " .superpowers/sdd/2026-09-15-it-toolbox-foundation/p02-t6-all.log | tail -2`
 
-Expected: `test=0 tc=0 lint=0`，用例总数为 **360 + 9 = 369**
+Expected: `test=0 tc=0 lint=0`，用例总数为 **361 + 9 = 370**
 
 - [ ] **Step 7: 提交**
 
@@ -2573,7 +2579,7 @@ Expected: PASS，9 个用例全绿（Token 7 + TextInput 2）
 
 Run: `npm test > .superpowers/sdd/2026-09-15-it-toolbox-foundation/p02-t7-all.log 2>&1; echo "test=$?"; npm run typecheck > /dev/null 2>&1; echo "tc=$?"; npm run lint > /dev/null 2>&1; echo "lint=$?"; grep -aE "Test Files|Tests " .superpowers/sdd/2026-09-15-it-toolbox-foundation/p02-t7-all.log | tail -2`
 
-Expected: `test=0 tc=0 lint=0`，用例总数为 **369 + 9 = 378**，且 `registry.test.ts` 的不变式（meta/Tool 配对、id 与目录名一致）自动通过
+Expected: `test=0 tc=0 lint=0`，用例总数为 **370 + 9 = 379**，且 `registry.test.ts` 的不变式（meta/Tool 配对、id 与目录名一致）自动通过
 
 - [ ] **Step 7: 提交**
 
@@ -2868,7 +2874,7 @@ Expected: PASS，6 个用例全绿
 
 Run: `npm test > .superpowers/sdd/2026-09-15-it-toolbox-foundation/p02-t8-all.log 2>&1; echo "test=$?"; npm run typecheck > /dev/null 2>&1; echo "tc=$?"; npm run lint > /dev/null 2>&1; echo "lint=$?"; grep -aE "Test Files|Tests " .superpowers/sdd/2026-09-15-it-toolbox-foundation/p02-t8-all.log | tail -2`
 
-Expected: `test=0 tc=0 lint=0`，用例总数为 **378 + 6 = 384**
+Expected: `test=0 tc=0 lint=0`，用例总数为 **379 + 6 = 385**
 
 - [ ] **Step 6: 提交**
 
@@ -3225,7 +3231,7 @@ Expected: PASS，7 个用例全绿
 
 Run: `npm test > .superpowers/sdd/2026-09-15-it-toolbox-foundation/p02-t9-all.log 2>&1; echo "test=$?"; npm run typecheck > /dev/null 2>&1; echo "tc=$?"; npm run lint > /dev/null 2>&1; echo "lint=$?"; grep -aE "Test Files|Tests " .superpowers/sdd/2026-09-15-it-toolbox-foundation/p02-t9-all.log | tail -2`
 
-Expected: `test=0 tc=0 lint=0`，用例总数为 **384 + 7 = 391**
+Expected: `test=0 tc=0 lint=0`，用例总数为 **385 + 7 = 392**
 
 - [ ] **Step 6: 提交**
 
@@ -3732,7 +3738,7 @@ Expected: PASS，9 个用例全绿（RSA 8 + Button 1）
 
 Run: `npm test > .superpowers/sdd/2026-09-15-it-toolbox-foundation/p02-t10-all.log 2>&1; echo "test=$?"; npm run typecheck > /dev/null 2>&1; echo "tc=$?"; npm run lint > /dev/null 2>&1; echo "lint=$?"; grep -aE "Test Files|Tests " .superpowers/sdd/2026-09-15-it-toolbox-foundation/p02-t10-all.log | tail -2`
 
-Expected: `test=0 tc=0 lint=0`，用例总数为 **391 + 9 = 400**
+Expected: `test=0 tc=0 lint=0`，用例总数为 **392 + 9 = 401**
 
 - [ ] **Step 7: 提交**
 
@@ -3800,9 +3806,9 @@ Expected: `exit≠0`，且日志里失败的**用例名集合包含**上表「�
 
 Run: `npm test > .superpowers/sdd/2026-09-15-it-toolbox-foundation/p02-t11-all.log 2>&1; echo "test=$?"; npm run typecheck > /dev/null 2>&1; echo "tc=$?"; npm run lint > /dev/null 2>&1; echo "lint=$?"; npm run scan:egress > /dev/null 2>&1; echo "egress=$?"; grep -aE "Test Files|Tests " .superpowers/sdd/2026-09-15-it-toolbox-foundation/p02-t11-all.log | tail -2`
 
-Expected: `test=0 tc=0 lint=0 egress=0`，用例总数 **400**，测试文件数 **36**。
+Expected: `test=0 tc=0 lint=0 egress=0`，用例总数 **401**，测试文件数 **36**。
 
-**这两个数字的来历**：计划① 收尾（T20 记录）实测 25 个测试文件 / 289 个用例；本计划新增 11 个测试文件（6 个 core + 4 个工具 + 1 个 `Inputs.test.tsx`）与 111 个用例（14 + 19 + 15 + 16 + 7 + 9 + 9 + 6 + 7 + 9 = 111）。**若实测与预期不符，以实测为准并回报差异**，不要改计划里的数字去凑。
+**这两个数字的来历**：计划① 收尾（T20 记录）实测 25 个测试文件 / 289 个用例；本计划新增 11 个测试文件（6 个 core + 4 个工具 + 1 个 `Inputs.test.tsx`）与 112 个用例（14 + 19 + 15 + 17 + 7 + 9 + 9 + 6 + 7 + 9 = 112）。**若实测与预期不符，以实测为准并回报差异**，不要改计划里的数字去凑。
 
 - [ ] **Step 4: 勾选 tasks.md**
 
@@ -3834,7 +3840,7 @@ git add openspec/changes/it-toolbox-app/tasks.md docs/superpowers/plans/2026-09-
 git commit -m "chore(openspec): 勾选 tasks.md 第 5 组加密工具条目，计划②-1 收尾
 
 - 10 项（5.1 / 5.3–5.7 / 5.9–5.12）全部完成，覆盖表与变异检验结果记入计划文件
-- 全量门禁：400 用例 / 36 文件，typecheck、lint、egress 扫描全绿
+- 全量门禁：401 用例 / 36 文件，typecheck、lint、egress 扫描全绿
 - 剩余未完成条目属计划②-2 / ②-3 / ②-4（转换器 / Web / 图片与开发）"
 ```
 
