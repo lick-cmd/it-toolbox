@@ -1,11 +1,11 @@
 workflow: full
 phase: build
-build_mode: null
-isolation: null
-verify_mode: null
+build_mode: subagent-driven-development
+isolation: branch
+verify_mode: full
 base_ref: null
 design_doc: docs/superpowers/specs/2026-09-15-it-toolbox-design.md
-plan: null
+plan: docs/superpowers/plans/2026-09-15-it-toolbox-foundation.md
 verify_result: pending
 verification_report: null
 branch_status: pending
