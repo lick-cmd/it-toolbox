@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildJsonTree, keyText, valueText, type JsonTreeNode } from './tree'
-import { jsonChildPath } from './type-hints'
+import { parseJson } from './parse'
+import { collectTypeHints, jsonChildPath } from './type-hints'
 
 /** 用例里反复要「按 path 找节点」，单独抽出来避免每处都写一遍递归 */
 function nodeAt(root: JsonTreeNode, path: string): JsonTreeNode | null {
@@ -125,6 +126,82 @@ describe('buildJsonTree', () => {
 
     expect(built.value.root.raw).toBe('{"a":1,"a":2}')
     expect(built.value.root.childCount).toBe(2)
+  })
+
+  it('重复键形态不同时不抛异常，各配自己那一对的原文与类型', () => {
+    // 每一对各自成节点：raw 与 type 都取自**它自己那一对**的 token。
+    // 若按「键 → 解析值」下钻，重复键只剩最后一个值，下钻就会按错误形状消费 token。
+    for (const [source, raws, types] of [
+      ['{"a":1,"a":[2]}', ['1', '[2]'], ['number', 'array']],
+      ['{"a":[2],"a":1}', ['[2]', '1'], ['array', 'number']],
+    ] as const) {
+      const built = buildJsonTree(source)
+      expect(built.ok).toBe(true)
+      if (!built.ok) return
+
+      expect(built.value.root.raw).toBe(source)
+      expect(built.value.root.childCount).toBe(2)
+      expect(built.value.root.children.map((child) => child.raw)).toEqual([...raws])
+      expect(built.value.root.children.map((child) => child.type)).toEqual([...types])
+    }
+  })
+
+  it('重复键形态不同时，祖先原文不串位', () => {
+    const source = '{"a":1,"a":[]}'
+    const built = buildJsonTree(source)
+    expect(built.ok).toBe(true)
+    if (!built.ok) return
+    expect(built.value.root.raw).toBe(source)
+    // 第一对是数字 1，不能被第二对的数组形状带偏（按解析值下钻时这里会拿到 '1,'）
+    expect(nodeAt(built.value.root, '$.a')?.raw).toBe('1')
+  })
+
+  it('上限层的 childCount 与可下钻层同口径', () => {
+    // 同一个「含重复键的对象」形状：低于上限时按源码里的实际键对数算，
+    // 达到上限时也必须一样 —— 不能因为不下钻就退回 Object.keys（重复键会被折叠成 1）。
+    const plain = buildJsonTree('{"a":1,"a":2}')
+    expect(plain.ok).toBe(true)
+    if (!plain.ok) return
+    expect(plain.value.root.childCount).toBe(2)
+
+    const cappedObject = '['.repeat(256) + '{"a":1,"a":2}' + ']'.repeat(256)
+    const built = buildJsonTree(cappedObject)
+    expect(built.ok).toBe(true)
+    if (!built.ok) return
+
+    const capped = `$${'[0]'.repeat(256)}`
+    const node = nodeAt(built.value.root, capped)
+    expect(node?.type).toBe('object')
+    expect(node?.childCount).toBe(2)
+    expect(node?.summary).toBe('{…} 2 键')
+    // 它的子层不再建节点（已到上限）
+    expect(nodeAt(built.value.root, `${capped}[0]`)).toBeNull()
+  })
+
+  it('类型口径与 collectTypeHints 逐节点一致', () => {
+    // 无重复键的文档：本树与类型提示必须给出同一套「路径 → 类型 / 标签」，一一对应。
+    const source = '{"a":1,"b":"x","c":[true,null],"d":{},"e":false}'
+    const parsed = parseJson(source)
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+
+    const built = buildJsonTree(source)
+    expect(built.ok).toBe(true)
+    if (!built.ok) return
+
+    const hints = new Map(collectTypeHints(parsed.value.value).map((hint) => [hint.path, hint]))
+    const nodes: JsonTreeNode[] = []
+    const collect = (node: JsonTreeNode): void => {
+      nodes.push(node)
+      for (const child of node.children) collect(child)
+    }
+    collect(built.value.root)
+
+    expect(nodes.length).toBe(hints.size)
+    for (const node of nodes) {
+      expect(hints.get(node.path)?.type).toBe(node.type)
+      expect(hints.get(node.path)?.label).toBe(node.label)
+    }
   })
 })
 

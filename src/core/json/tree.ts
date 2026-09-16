@@ -1,12 +1,12 @@
 import { ok } from '../result'
 import type { Result } from '../result'
 import { parseJson } from './parse'
+import type { JsonToken } from './scanner'
 import {
   JSON_TYPE_LABEL,
   TYPE_HINT_MAX_DEPTH,
   jsonChildPath,
   jsonIndexPath,
-  typeOf,
 } from './type-hints'
 import type { JsonValueType } from './type-hints'
 
@@ -79,6 +79,25 @@ function collapsedSummary(type: JsonValueType, childCount: number): string {
   return ''
 }
 
+/**
+ * 值类型直接由 token 判定。
+ *
+ * 不用 `typeOf(value)`：`JSON.parse` 把重复键折叠成最后一个值，于是「值的形状」与
+ * 「源码里这一对的形状」会分家 —— `{"a":1,"a":[2]}` 的第一对明明是数字，按值判定
+ * 却得到数组，下钻随即按数组的形状消费 token，游标越过 pair 边界。结构与类型都只
+ * 看 token，这条不一致就不存在。标签仍取 `JSON_TYPE_LABEL`，与类型提示视图同口径。
+ */
+function typeFromToken(token: JsonToken | undefined): JsonValueType {
+  if (token === undefined) return 'absent'
+  if (token.raw === '{') return 'object'
+  if (token.raw === '[') return 'array'
+  if (token.kind === 'string') return 'string'
+  if (token.kind === 'number') return 'number'
+  if (token.raw === 'true' || token.raw === 'false') return 'boolean'
+  if (token.raw === 'null') return 'null'
+  return 'absent'
+}
+
 export function buildJsonTree(text: string): Result<JsonTreeModel> {
   const parsed = parseJson(text)
   if (!parsed.ok) return parsed
@@ -87,9 +106,10 @@ export function buildJsonTree(text: string): Result<JsonTreeModel> {
   let cursor = 0
   let nodeCount = 0
 
-  // 结构取值、文本取 token。两者并非天然对齐：**键序必须由 token 流决定** ——
-  // `Object.keys` 会把 "1" 这类整数样键排到前面，且重复键只保留最后一个，
-  // 照它迭代会让 raw 与键整体错位。越界读取兜成空串，只为不让界面吃到异常。
+  // 结构、类型与文本**全部取自 token**：源码里第 n 个 token 是唯一真相。
+  // 值对象那条路（`Object.keys` / `record[key]`）做不到 —— 整数样键会被重排，
+  // 重复键只留最后一个，按「解析值的形状」下钻就会越过 pair 边界。
+  // 越界读取兜成空串，只为不让界面吃到异常。
   const rawAt = (index: number): string => tokens[index]?.raw ?? ''
 
   const skipIf = (raw: string): void => {
@@ -97,74 +117,91 @@ export function buildJsonTree(text: string): Result<JsonTreeModel> {
   }
 
   /**
-   * 只在达到深度上限时使用：把整棵子树的 token 消费掉，**停在本节点自己的闭合符之前**
-   * —— 调用方随后那一次 `cursor++` 负责收尾。若在此处吞掉闭合符，父层分隔符
-   * 判断会错位，后面所有节点的 raw 都会串位。
+   * 达到深度上限时的收尾扫描：消费**整层** token，并数出本层的直接子项数。
    *
-   * 进入时游标在本节点的**内容起点**（开括号已被消费），所以 depth 从 0 起算：
+   * 「跳过」与「计数」合成一趟扫描，是为了让上限层的 `childCount` / `summary`
+   * 与可下钻路径同口径 —— 否则同一份输入会因为是否达上限而给出不同的键数 / 项数。
+   *
+   * 停在本层自己的闭合符之前 —— 调用方随后那一次 `cursor++` 负责收尾。若在此处
+   * 吞掉闭合符，父层分隔符判断会错位，后面所有节点的 raw 都会串位。
+   *
+   * 进入时游标在本层的**内容起点**（开括号已被消费），所以 depth 从 0 起算：
    * 内容里的元素若自带容器，其闭合符会把 depth 拉回 0，**回到 0 不再停手** ——
-   * 只有「深度为 0 时遇到的闭合符」才是本节点自己的收尾点。内容以非开括号开头
+   * 只有「深度为 0 时遇到的闭合符」才是本层自己的收尾点。内容以非开括号开头
    * （空容器、标量）是常态，故这条判断必须放在消费 token 之前。
    */
-  const skipSubtree = (): void => {
+  const skipLayer = (isArray: boolean): number => {
     let depth = 0
+    let count = 0
+    // 对象在 depth 0 上按「键 token」计数：值本身若是字符串，不能跟着一起数进去
+    let expectKey = !isArray
     while (cursor < tokens.length) {
       const raw = rawAt(cursor)
-      // 只有「本节点自己的闭合符」会以 depth === 0 出现：停在它之前，收尾交给调用方
-      if ((raw === '}' || raw === ']') && depth === 0) return
+      // 只有「本层自己的闭合符」会以 depth === 0 出现：停在它之前，收尾交给调用方
+      if ((raw === '}' || raw === ']') && depth === 0) return count
+      if (depth === 0) {
+        if (isArray) {
+          if (raw !== ',') count++
+        } else if (expectKey) {
+          count++
+          expectKey = false
+        } else if (raw === ',') {
+          expectKey = true
+        }
+      }
       cursor++
       if (raw === '{' || raw === '[') depth++
       else if (raw === '}' || raw === ']') depth--
     }
+    return count
   }
 
   const walk = (
-    value: unknown,
     key: string | number | null,
     path: string,
     depth: number,
   ): JsonTreeNode => {
-    const type = typeOf(value)
     const startIndex = cursor
     nodeCount++
 
+    const type = typeFromToken(tokens[cursor])
     const children: JsonTreeNode[] = []
     let childCount = 0
 
     if (type === 'object') {
-      const record = value as Record<string, unknown>
       cursor++ // '{'
       if (depth < TREE_MAX_DEPTH) {
-        // 键序由 token 流决定，**不能**用 Object.keys 迭代：它会把 "1" 这类整数样键
-        // 排到前面，且重复键只保留最后一个 —— 照它迭代会让 path 与 raw 整体错位。
-        // 值仍按键从解析结果取（`JSON.parse` 的语义：重复键取最后一个）。
+        // 逐 token 前进：源码里第 n 对就建第 n 个节点，键序与原文都不经过值对象。
+        // 重复键于是各自成节点、各配自己那一对的 raw 与类型（path 会相同，这是有意的：
+        // 显示忠实于源码优先，不去编造后缀）。
         while (cursor < tokens.length && rawAt(cursor) !== '}') {
-          const keyRaw = rawAt(cursor)
-          const childKey = JSON.parse(keyRaw) as string
-          cursor++ // 键字符串
+          const keyToken = tokens[cursor]
+          // 键位置不是字符串 token，说明结构判断有误：停手保底，宁可少建节点也不吞异常
+          if (keyToken?.kind !== 'string') break
+          // 键 token 必是合法 JSON 字符串字面量（scanner 已校验转义），JSON.parse 只用来解码
+          const childKey = JSON.parse(keyToken.raw) as string
+          cursor++ // 键
           cursor++ // ':'
-          children.push(walk(record[childKey], childKey, jsonChildPath(path, childKey), depth + 1))
+          children.push(walk(childKey, jsonChildPath(path, childKey), depth + 1))
           childCount++
           skipIf(',')
         }
       } else {
-        // 上限层不下钻，只能在值对象上取键数（与数组分支的 items.length 同口径）；
-        // 无重复键时它等于源码里的键对数。
-        childCount = Object.keys(record).length
-        skipSubtree()
+        childCount = skipLayer(false)
       }
       cursor++ // '}'
     } else if (type === 'array') {
-      const items = value as unknown[]
-      childCount = items.length
       cursor++ // '['
       if (depth < TREE_MAX_DEPTH) {
-        for (let index = 0; index < items.length; index++) {
-          children.push(walk(items[index], index, jsonIndexPath(path, index), depth + 1))
+        let index = 0
+        while (cursor < tokens.length && rawAt(cursor) !== ']') {
+          children.push(walk(index, jsonIndexPath(path, index), depth + 1))
+          index++
+          childCount++
           skipIf(',')
         }
       } else {
-        skipSubtree()
+        childCount = skipLayer(true)
       }
       cursor++ // ']'
     } else {
@@ -185,7 +222,7 @@ export function buildJsonTree(text: string): Result<JsonTreeModel> {
     }
   }
 
-  const root = walk(parsed.value.value, null, '$', 0)
+  const root = walk(null, '$', 0)
 
   return ok({
     root,
