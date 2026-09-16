@@ -92,13 +92,14 @@
 
 ## 8. 图片与开发工具
 
-- [ ] 8.1 实现 `core/image/qrcode.ts`：前景/背景色、纠错等级、模块尺寸，输出 Canvas 与 SVG
-- [ ] 8.2 编写二维码 Core 用例：容量上限、中文往返、颜色选项
-- [ ] 8.3 实现二维码生成器工具：实时预览、对比度不足警告、内容过长提示、导出 PNG/SVG、复制图片
-- [ ] 8.4 实现 `core/dev/json-format.ts`：`minifyJson` 与 `formatJson`（缩进、键排序、保留字符串内空白与转义）
-- [ ] 8.5 编写 JSON 压缩/美化的往返一致性用例与大输入用例
-- [ ] 8.6 实现 JSON 压缩工具（展示压缩前后字节数与节省比例、错误定位）
-- [ ] 8.7 实现 JSON 美化格式化工具（缩进选项、键排序开关、错误行号列号定位、大输入的处理中状态、键排序模式的行为提示）
+- [x] 8.1 实现 `core/image/qrcode.ts`：前景/背景色、纠错等级、模块尺寸，输出 Canvas 与 SVG
+- [x] 8.2 编写二维码 Core 用例：容量上限、中文往返、颜色选项
+- [x] 8.3 实现二维码生成器工具：实时预览、对比度不足警告、内容过长提示、导出 PNG/SVG、复制图片
+- [x] 8.4 实现 `core/dev/json-format.ts`：`minifyJson` 与 `formatJson`（缩进、键排序、保留字符串内空白与转义）
+  - 已由 8.10 交付：`minifyJson` / `formatJson` 直接由 `core/json/{minify,format}.ts` 提供，工具层直连；`core/dev/` 组合层作为薄转发层按计划① Task 8 的决定取消（不新建 `core/dev/`）
+- [x] 8.5 编写 JSON 压缩/美化的往返一致性用例与大输入用例
+- [x] 8.6 实现 JSON 压缩工具（展示压缩前后字节数与节省比例、错误定位）
+- [x] 8.7 实现 JSON 美化格式化工具（缩进选项、键排序开关、错误行号列号定位、大输入的处理中状态、键排序模式的行为提示）
 - [x] 8.8 实现 `core/json/scanner.ts`：逐 token 扫描 + 结构校验 + 行号/列号/偏移定位，并编写表格驱动的错误定位用例（这是跨 WebView 一致性的保障）
 - [x] 8.9 实现 `core/json/parse.ts` 严格解析入口，并接入全部使用点（json→yaml、json-diff、jwt 载荷、dev-tools）
 - [x] 8.10 实现 token 级 `minify.ts` 与 `format.ts`：跳过字符串内部，保留转义字面量，保证 `minify(format(x))` 逐字节往返
