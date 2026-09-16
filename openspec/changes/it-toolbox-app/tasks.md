@@ -1,63 +1,63 @@
 ## 1. 项目脚手架与构建基座
 
-- [ ] 1.1 初始化前端工程：Vite + React + TypeScript，配置 `@/*` 路径别名指向 `src/`
-- [ ] 1.2 接入 Tailwind CSS，定义亮/暗两套主题令牌（背景、前景、边框、强调色）
-- [ ] 1.3 初始化 Tauri 2.x 工程（`src-tauri/`），配置窗口标题、初始尺寸与最小尺寸
-- [ ] 1.4 配置 Tauri 安全策略：关闭不需要的能力，仅开启文件读写与导出所需权限
-- [ ] 1.5 接入 Vitest 并在 Node 环境跑通一个 Core 层的占位测试
-- [ ] 1.6 配置 ESLint 依赖方向规则：禁止 `core/` import React 或 Tauri，禁止 `framework/` import `tools/` 具体实现
-- [ ] 1.7 配置 `tauri.conf.json` 的 bundle targets 为 `dmg` + `nsis`，预留签名配置位（环境变量注入）
-- [ ] 1.8 打通本机 `tauri dev` 与 `tauri build`，确认可产出可运行的调试产物
-- [ ] 1.9 配置内容安全策略：`connect-src 'none'`，`img-src`/`font-src`/`style-src`/`script-src` 均不含远程来源；手工验证外发请求被拒
-- [ ] 1.10 配置 Windows `webviewInstallMode` 为 `skip`，并验证安装过程零网络请求；记录 `offlineInstaller` 变体的构建开关
+- [x] 1.1 初始化前端工程：Vite + React + TypeScript，配置 `@/*` 路径别名指向 `src/`
+- [x] 1.2 接入 Tailwind CSS，定义亮/暗两套主题令牌（背景、前景、边框、强调色）
+- [x] 1.3 初始化 Tauri 2.x 工程（`src-tauri/`），配置窗口标题、初始尺寸与最小尺寸
+- [x] 1.4 配置 Tauri 安全策略：关闭不需要的能力，仅开启文件读写与导出所需权限
+- [x] 1.5 接入 Vitest 并在 Node 环境跑通一个 Core 层的占位测试
+- [x] 1.6 配置 ESLint 依赖方向规则：禁止 `core/` import React 或 Tauri，禁止 `framework/` import `tools/` 具体实现
+- [x] 1.7 配置 `tauri.conf.json` 的 bundle targets 为 `dmg` + `nsis`，预留签名配置位（环境变量注入）
+- [x] 1.8 打通本机 `tauri dev` 与 `tauri build`，确认可产出可运行的调试产物
+- [x] 1.9 配置内容安全策略：`connect-src 'none'`，`img-src`/`font-src`/`style-src`/`script-src` 均不含远程来源；手工验证外发请求被拒
+- [x] 1.10 配置 Windows `webviewInstallMode` 为 `skip`，并验证安装过程零网络请求；记录 `offlineInstaller` 变体的构建开关
 
 ## 2. 工具注册框架
 
-- [ ] 2.1 定义框架类型：`ToolMeta`、`ToolCategory`、`ToolManifest`、`Result<T>`
-- [ ] 2.2 实现 `defineTool` 声明辅助函数与类别枚举常量（加密/转换器/Web/图片/开发）
-- [ ] 2.3 实现 `registry.ts`：基于 `import.meta.glob` 自动发现 `meta.ts`（同步）与 `Tool.tsx`（懒加载）并完成配对
-- [ ] 2.4 实现一致性校验：meta/Tool 配对、`id` 唯一、`id` 与目录名一致、类别合法、keywords 非空，违反时定位到具体目录
-- [ ] 2.5 编写 `registry.test.ts`，覆盖校验的全部失败分支与通过分支
-- [ ] 2.6 实现模糊搜索：在元数据层匹配 name / keywords / category，返回带排序的结果列表，且不触发组件加载
-- [ ] 2.7 编写搜索单测：中英文混合查询、按关键词命中、无结果、排序稳定性
+- [x] 2.1 定义框架类型：`ToolMeta`、`ToolCategory`、`ToolManifest`、`Result<T>`
+- [x] 2.2 实现 `defineTool` 声明辅助函数与类别枚举常量（加密/转换器/Web/图片/开发）
+- [x] 2.3 实现 `registry.ts`：基于 `import.meta.glob` 自动发现 `meta.ts`（同步）与 `Tool.tsx`（懒加载）并完成配对
+- [x] 2.4 实现一致性校验：meta/Tool 配对、`id` 唯一、`id` 与目录名一致、类别合法、keywords 非空，违反时定位到具体目录
+- [x] 2.5 编写 `registry.test.ts`，覆盖校验的全部失败分支与通过分支
+- [x] 2.6 实现模糊搜索：在元数据层匹配 name / keywords / category，返回带排序的结果列表，且不触发组件加载
+- [x] 2.7 编写搜索单测：中英文混合查询、按关键词命中、无结果、排序稳定性
 
 ## 3. 统一交互层
 
-- [ ] 3.1 实现 `ToolLayout`：Header（名称/描述/收藏）、OptionsBar、InputPanel、OutputPanel 四个区域，input/output 为可选插槽
-- [ ] 3.2 实现 `InputPanel`：文本输入、清空、填入示例、文件拖入，支持只读模式
-- [ ] 3.3 实现 `OutputPanel`：只读输出、复制、下载、交换，支持自定义渲染插槽（用于预览类结果）
-- [ ] 3.4 实现 `framework/clipboard.ts`：优先 `navigator.clipboard`，失败回退到 Tauri 剪贴板能力
-- [ ] 3.5 实现 `framework/file.ts`：文本下载与二进制下载（Blob + Tauri 保存对话框）
-- [ ] 3.6 实现 `useToolState`：按工具 id 隔离的输入/参数持久化，含清空语义
-- [ ] 3.7 实现 `ToolErrorBoundary`：单工具渲染异常隔离，提供重试入口且不影响侧栏与搜索
-- [ ] 3.8 实现统一空态与错误提示组件（非法输入、无结果、无内容三种形态）
-- [ ] 3.9 响应式布局：窗口宽度小于 720px 时输入输出区由并排转为堆叠
-- [ ] 3.10 实现解析错误的统一呈现与输入区定位高亮：展示原因 + 行号/列号/偏移，无法定位时降级为仅展示原因
+- [x] 3.1 实现 `ToolLayout`：Header（名称/描述/收藏）、OptionsBar、InputPanel、OutputPanel 四个区域，input/output 为可选插槽
+- [x] 3.2 实现 `InputPanel`：文本输入、清空、填入示例、文件拖入，支持只读模式
+- [x] 3.3 实现 `OutputPanel`：只读输出、复制、下载、交换，支持自定义渲染插槽（用于预览类结果）
+- [x] 3.4 实现 `framework/clipboard.ts`：优先 `navigator.clipboard`，失败回退到 Tauri 剪贴板能力
+- [x] 3.5 实现 `framework/file.ts`：文本下载与二进制下载（Blob + Tauri 保存对话框）
+- [x] 3.6 实现 `useToolState`：按工具 id 隔离的输入/参数持久化，含清空语义
+- [x] 3.7 实现 `ToolErrorBoundary`：单工具渲染异常隔离，提供重试入口且不影响侧栏与搜索
+- [x] 3.8 实现统一空态与错误提示组件（非法输入、无结果、无内容三种形态）
+- [x] 3.9 响应式布局：窗口宽度小于 720px 时输入输出区由并排转为堆叠
+- [x] 3.10 实现解析错误的统一呈现与输入区定位高亮：展示原因 + 行号/列号/偏移，无法定位时降级为仅展示原因
 
 ## 4. 应用外壳与导航
 
-- [ ] 4.1 实现主布局：分类侧栏 + 工具面板
-- [ ] 4.2 实现侧栏：按类别分组渲染工具，类别无工具时不展示
-- [ ] 4.3 实现命令面板（Cmd/Ctrl+K）：唤起、搜索、键盘上下选择与回车打开，输入框聚焦时快捷键仍生效
-- [ ] 4.4 实现主题切换：亮/暗/跟随系统，持久化用户选择
-- [ ] 4.5 实现偏好存储层：主题、最近使用、收藏、各工具状态
-- [ ] 4.6 实现最近使用与收藏区，排序规则与取消收藏
-- [ ] 4.7 实现默认落地工具逻辑：有最近使用则打开最近一项，否则打开内置默认项
-- [ ] 4.8 搭建并验证样板链路：UUID 工具可被搜索、打开、复制、状态恢复，且其余工具组件未被加载
-- [ ] 4.9 实现窄窗口侧栏折叠：宽度不足时收起为抽屉，可唤起、选中工具后自动收起
-- [ ] 4.10 实现 `offline-guard.ts`：开发构建包装 `fetch`/`XMLHttpRequest`/`WebSocket`，命中即抛错并显著提示
-- [ ] 4.11 编写构建产物外发扫描脚本，发现远程 URL 字面量即令构建失败
+- [x] 4.1 实现主布局：分类侧栏 + 工具面板
+- [x] 4.2 实现侧栏：按类别分组渲染工具，类别无工具时不展示
+- [x] 4.3 实现命令面板（Cmd/Ctrl+K）：唤起、搜索、键盘上下选择与回车打开，输入框聚焦时快捷键仍生效
+- [x] 4.4 实现主题切换：亮/暗/跟随系统，持久化用户选择
+- [x] 4.5 实现偏好存储层：主题、最近使用、收藏、各工具状态
+- [x] 4.6 实现最近使用与收藏区，排序规则与取消收藏
+- [x] 4.7 实现默认落地工具逻辑：有最近使用则打开最近一项，否则打开内置默认项
+- [x] 4.8 搭建并验证样板链路：UUID 工具可被搜索、打开、复制、状态恢复，且其余工具组件未被加载
+- [x] 4.9 实现窄窗口侧栏折叠：宽度不足时收起为抽屉，可唤起、选中工具后自动收起
+- [x] 4.10 实现 `offline-guard.ts`：开发构建包装 `fetch`/`XMLHttpRequest`/`WebSocket`，命中即抛错并显著提示
+- [x] 4.11 编写构建产物外发扫描脚本，发现远程 URL 字面量即令构建失败
 
 ## 5. 加密类工具
 
 - [ ] 5.1 实现 `core/crypto/token.ts`：安全随机、字符集（字母数字/hex/base64/base64url/自定义）、长度、数量、前缀
-- [ ] 5.2 实现 `core/crypto/uuid.ts`：v1（随机 multicast 节点 ID）、v4、v7（时间有序）、格式选项
+- [x] 5.2 实现 `core/crypto/uuid.ts`：v1（随机 multicast 节点 ID）、v4、v7（时间有序）、格式选项
 - [ ] 5.3 实现 `core/crypto/ulid.ts`：Crockford Base32 编解码、时间戳解析、同毫秒单调递增
 - [ ] 5.4 实现 `core/crypto/hmac.ts`：SHA-1/256/384/512、密钥编码（UTF-8/hex/base64）、输出编码（hex/base64/base64url）
 - [ ] 5.5 实现 `core/crypto/rsa.ts`：密钥对生成、PEM 导出（PKCS#1 / PKCS#8 / SPKI / OpenSSH）
 - [ ] 5.6 编写上述 Core 的 Vitest 用例，覆盖 spec 中全部 Scenario（含非法输入分支）
 - [ ] 5.7 实现 Token 生成器工具（含字符集为空的校验提示）
-- [ ] 5.8 实现 UUID 生成器工具（含 v1 节点 ID 为随机值的界面说明）
+- [x] 5.8 实现 UUID 生成器工具（含 v1 节点 ID 为随机值的界面说明）
 - [ ] 5.9 实现 ULID 生成器工具（展示解码出的时间戳）
 - [ ] 5.10 实现 HMAC 生成器工具（含密钥为空与非法 hex 的提示）
 - [ ] 5.11 实现 RSA 密钥对生成器工具（生成中禁用重复提交、参数变更不自动重算、公钥私钥分别复制与导出）
@@ -99,9 +99,9 @@
 - [ ] 8.5 编写 JSON 压缩/美化的往返一致性用例与大输入用例
 - [ ] 8.6 实现 JSON 压缩工具（展示压缩前后字节数与节省比例、错误定位）
 - [ ] 8.7 实现 JSON 美化格式化工具（缩进选项、键排序开关、错误行号列号定位、大输入的处理中状态、键排序模式的行为提示）
-- [ ] 8.8 实现 `core/json/scanner.ts`：逐 token 扫描 + 结构校验 + 行号/列号/偏移定位，并编写表格驱动的错误定位用例（这是跨 WebView 一致性的保障）
-- [ ] 8.9 实现 `core/json/parse.ts` 严格解析入口，并接入全部使用点（json→yaml、json-diff、jwt 载荷、dev-tools）
-- [ ] 8.10 实现 token 级 `minify.ts` 与 `format.ts`：跳过字符串内部，保留转义字面量，保证 `minify(format(x))` 逐字节往返
+- [x] 8.8 实现 `core/json/scanner.ts`：逐 token 扫描 + 结构校验 + 行号/列号/偏移定位，并编写表格驱动的错误定位用例（这是跨 WebView 一致性的保障）
+- [x] 8.9 实现 `core/json/parse.ts` 严格解析入口，并接入全部使用点（json→yaml、json-diff、jwt 载荷、dev-tools）
+- [x] 8.10 实现 token 级 `minify.ts` 与 `format.ts`：跳过字符串内部，保留转义字面量，保证 `minify(format(x))` 逐字节往返
 
 ## 9. 全量验收与打包
 
