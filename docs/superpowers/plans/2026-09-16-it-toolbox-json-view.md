@@ -420,8 +420,6 @@ git commit -m "feat(core): token 驱动的 JSON 值树（原文保真 + 折叠�
 在 `src/core/json/tree.test.ts` 末尾追加：
 
 ```ts
-import { collapseAllPaths, visibleRows } from './tree'
-
 /** 造一个指定节点数的数组：n 个元素 → n + 1 个节点 */
 function arrayOf(count: number): string {
   return `[${Array.from({ length: count }, (_, index) => index).join(',')}]`
@@ -1265,6 +1263,10 @@ const output = screen.getByTestId('json-code')
 expect(output.querySelector('[data-testid="json-code-line"]')?.textContent).toBe('{')
 ```
 
+先跑再改，不要预先重写断言：`json-minify` 与 `yaml-to-json` 里既有的 `lines()` 辅助函数（取每个 `li` 的最后一个子元素）在 `JsonCode` 下照样成立 —— `JsonCode` 同样按行渲染 `<li>`，内容列就是该行的最后一个子元素 —— 这两个文件大概率不用动。真正要改的只是把整行当成单个文本节点断言的地方（`getByText('{"a":1}')` 这一类）。
+
+一处**有意的行为差异**：`CodeArea` 在空行上渲染一个空格，`JsonCode` 渲染空串（文本不变量要求渲染结果等于原文）。若某条断言依赖那个空格，按原文改断言，不要给组件加填充字符 —— 加了就破坏 spec 的「高亮不改变文本」。
+
 同时在四个工具里各加一条最短断言，钉住「输出确实由框架层组件着色」（对应 `tool-registry` 的「统一的只读 JSON 视图」Scenario）——否则日后有人图省事改回 `CodeArea`，没有用例会拦：
 
 ```tsx
@@ -1313,11 +1315,9 @@ git commit -m "feat(tools): 四处只读 JSON 输出接入 JsonCode 着色
 
 - [ ] **Step 1: 写失败用例**
 
-在 `src/tools/dev/json-format/Tool.test.tsx` 末尾追加：
+在 `src/tools/dev/json-format/Tool.test.tsx` 末尾追加（该文件顶部已 import `userEvent` 与 `vi`，不要重复写）：
 
 ```tsx
-import userEvent from '@testing-library/user-event'
-
 describe('树形视图', () => {
   it('切到树形后展示可折叠节点，折叠后显示摘要', async () => {
     const user = userEvent.setup()
@@ -1457,6 +1457,8 @@ const tree = useMemo(
 )}
 ```
 
+> 这段分支替换掉的正是 Task 7 里改过的那一段 —— 别把截断提示留成两份：以本块为准，删掉旧的那一份。
+>
 > `tree === null` 那条实际不会走到：输出区只在 `result.ok` 分支内渲染，空输入与非法输入由外层 `EmptyState` / `ErrorNote` 处理。保留它只是让类型收窄成立、并给未来的重构留个安全的兜底。
 
 - [ ] **Step 4: 跑用例确认通过**
@@ -1528,11 +1530,7 @@ describe('树形与源码的一致性', () => {
 })
 ```
 
-顶部 import 补 `vi`：
-
-```tsx
-import { describe, expect, it, vi } from 'vitest'
-```
+该文件顶部已是 `import { beforeEach, describe, expect, it, vi } from 'vitest'`，`vi` 无需再补（动手前确认一遍即可）。
 
 - [ ] **Step 2: 跑用例确认通过**
 
