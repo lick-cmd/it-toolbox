@@ -138,6 +138,29 @@ describe('computeHmac', () => {
     }
   })
 
+  it('非法 hex 的错误偏移指向首个非法字符，而非恒为 0', async () => {
+    // 'zz' 的首个非法字符恰在 0 位，那条断言无法区分「真实偏移」与「硬编码 0」，
+    // 故这里用非法字符不在起始位的向量。
+    const result = await computeHmac({ ...BASE_OPTIONS, key: '0bzz' })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('BAD_KEY')
+      expect(result.offset).toBe(2)
+    }
+  })
+
+  it('消息为非法十六进制时返回 BAD_MESSAGE 而不是抛错', async () => {
+    const result = await computeHmac({ ...BASE_OPTIONS, message: '68zz', messageEncoding: 'hex' })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('BAD_MESSAGE')
+      expect(result.error).toContain('消息格式非法')
+      expect(result.offset).toBe(2)
+    }
+  })
+
   it('消息为空是合法输入，仍产出摘要', async () => {
     const result = await computeHmac({ ...BASE_OPTIONS, message: '' })
 

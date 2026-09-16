@@ -73,9 +73,10 @@ export async function computeHmac(options: HmacOptions): Promise<Result<string>>
     })
   }
 
-  // new Uint8Array(...) 是显式复制：bytes.ts 的返回值是 Uint8Array<ArrayBufferLike>，
-  // 与 WebCrypto 的 BufferSource（要求 ArrayBuffer 支撑）不兼容。计划已预告此处，
-  // 明确要求用复制而非 as any / @ts-expect-error 绕过。
+  // new Uint8Array(...) 只是为过 TS 的类型：bytes.ts 的解码器返回 Uint8Array<ArrayBufferLike>，
+  // 而 WebCrypto 的 BufferSource 在 TS 5.7+ 要求 Uint8Array<ArrayBuffer>。运行期两者本可互传
+  // （解码器返回的都是新建数组，不是 SharedArrayBuffer 支撑的视图），故这次复制是语义上的空操作。
+  // 按计划要求用显式复制，而不是 as any / @ts-expect-error 绕过类型。
   const cryptoKey = await globalThis.crypto.subtle.importKey(
     'raw',
     new Uint8Array(keyBytes.value),
