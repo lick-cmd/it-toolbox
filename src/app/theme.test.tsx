@@ -3,7 +3,9 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { render } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { buildJsonTree } from '@/core/json/tree'
 import { JsonCode } from '@/framework/ui/JsonCode'
+import { JsonTree } from '@/framework/ui/JsonTree'
 
 // 相对本文件定位 theme.css。不要写成 `new URL('./theme.css', import.meta.url)`：该字面量
 // 形态会被 Vite 的 asset-import-meta-url 转换静态改写为 dev server 的 http 地址（jsdom 工程
@@ -53,6 +55,27 @@ describe('theme.css 的 JSON 配色', () => {
         .filter((name) => name.startsWith('json-')),
     )
     expect(used.size).toBeGreaterThan(0) // 一个类都没渲染时不许静默通过
+    for (const name of used) expect(declaredClasses(), `theme.css 缺少 .${name} 的规则`).toContain(name)
+  })
+
+  it('JsonTree 实际渲染出的每个着色类都有规则', () => {
+    // 树的值类型（boolean/null）比 token 类别（literal）更细，若组件直接把 node.type 拼进
+    // 类名，就会渲染出 theme.css 里没有的 .json-boolean / .json-null —— 那两个值静默不着色。
+    const built = buildJsonTree('{"s":"x","n":1,"b":true,"z":null,"o":{},"a":[]}')
+    if (!built.ok) throw new Error(built.error)
+    // 这份输入一次覆盖树会用到的全部 9 个类：根 object、空数组 array、四类标量、
+    // 类型标签、行与折叠开关（空容器不给开关，故开关类由根提供）
+    const { container } = render(<JsonTree tree={built.value} />)
+    const used = new Set(
+      Array.from(
+        container.querySelectorAll('[data-testid="json-tree-row"], [data-testid="json-tree-row"] *'),
+      )
+        .map((node) => node.className)
+        .filter((name) => name.startsWith('json-')),
+    )
+    // 写死 9：把「组件实际用到的类清单」与 Task 4 的 Produces 钉在一起。
+    // 少了就说明组件拼错了类名（漏类不会让这条退化成只检查「渲染出的类都有规则」）
+    expect(used).toHaveLength(9)
     for (const name of used) expect(declaredClasses(), `theme.css 缺少 .${name} 的规则`).toContain(name)
   })
 })
