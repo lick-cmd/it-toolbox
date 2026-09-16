@@ -21,12 +21,15 @@ export function sshString(bytes: Uint8Array): Uint8Array {
 /**
  * `mpint`（RFC 4251 §5）：有符号的大端补码整数。
  *
- * 与 DER INTEGER 的正数处理一致：先剥前导 0x00，再在最高位为 1 时补一个 0x00。
- * 少了这一步，高位为 1 的模数会被对端读成负数。零值按 RFC 编码为空内容。
+ * 先剥**全部**前导 0x00（RFC 4251 §5 禁止「不必要的前导 0x00」），再在最高位为 1 时补
+ * 一个 0x00 —— 少了补零，高位为 1 的模数会被对端读成负数。
+ *
+ * 零值按 RFC 编码为**空内容**：这里剥到空数组而不是像 DER 那样保留一个 0x00
+ * （DER 要求 INTEGER 至少一个内容字节，两条规范在这一点的要求相反）。
  */
 export function sshMpint(bytes: Uint8Array): Uint8Array {
   let start = 0
-  while (start < bytes.length - 1 && bytes[start] === 0x00) start++
+  while (start < bytes.length && bytes[start] === 0x00) start++
   const trimmed = bytes.slice(start)
 
   const needsPad = trimmed.length > 0 && ((trimmed[0] ?? 0) & 0x80) !== 0

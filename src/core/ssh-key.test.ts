@@ -49,7 +49,11 @@ describe('sshMpint', () => {
   })
 
   it('零编码为空内容', () => {
+    // RFC 4251 §5：零值编码为零长度；且不得含「不必要的前导 0x00」，
+    // 故 00 与 0000 也必须落到空内容（此处与 DER INTEGER 的要求相反）。
     expect(toHex(sshMpint(new Uint8Array(0)))).toBe('00000000')
+    expect(toHex(sshMpint(fromHex('00')))).toBe('00000000')
+    expect(toHex(sshMpint(fromHex('0000')))).toBe('00000000')
   })
 })
 
@@ -75,9 +79,15 @@ describe('sshRsaPublicKey', () => {
 
     const e = readField(blob.value, algorithm.next)
     expect(toHex(unsignedOf(e.value))).toBe(toHex(exponent))
+    // unsignedOf 会把两侧的前导零都剥掉，故它能通过并不代表输出端没有多余的 0x00；
+    // 这两条按**原始字节**逐字节钉住字段内容（e 最高位为 0 ⇒ 恰好 3 字节，不补零）。
+    expect(toHex(e.value)).toBe('010001')
 
     const n = readField(blob.value, e.next)
     expect(toHex(unsignedOf(n.value))).toBe(toHex(modulus))
+    // 模数首字节 0xc1 最高位为 1 ⇒ 恰好补**一个** 0x00，多补一个都会被这里抓住。
+    expect(toHex(n.value.slice(0, 3))).toBe('00c1ab')
+    expect(n.value.length).toBe(modulus.length + 1)
 
     expect(n.next).toBe(blob.value.length)
   })
@@ -93,6 +103,8 @@ describe('sshRsaPublicKey', () => {
     const n = readField(blob.value, e.next)
 
     expect(n.value[0]).toBe(0x00)
+    expect(n.value[1]).toBe(0xff)
+    expect(n.value.length).toBe(highBitModulus.length + 1)
     expect(toHex(unsignedOf(n.value))).toBe(toHex(highBitModulus))
   })
 })
