@@ -51,7 +51,13 @@ describe('注册表不变式', () => {
   it('listByCategory 只返回该类别且保持顺序稳定', () => {
     const crypto = listByCategory('crypto')
     expect(crypto.every((e) => e.meta.category === 'crypto')).toBe(true)
-    expect(listByCategory('image')).toEqual([])
+
+    // 不再断言「某类别为空」（原写法断言 image 为空）：并行工作流新增工具
+    // （image 的 qrcode-generator）会把它变成假失败。改为对**全部类别**校验
+    // 「只返回该类别」这一不变式 —— 它才是这条用例真正要保护的东西。
+    for (const category of TOOL_CATEGORIES) {
+      expect(listByCategory(category).every((e) => e.meta.category === category)).toBe(true)
+    }
 
     // 同一输入两次调用结果一致
     expect(listByCategory('crypto').map((e) => e.meta.id)).toEqual(
