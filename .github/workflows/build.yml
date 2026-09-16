@@ -1,7 +1,9 @@
 name: build
 
 # 技术设计 §6.3 承诺的四平台矩阵：macOS(arm64/x64) + Windows(x64/arm64)。
-# 打包产物不签名、不公证（本仓库不申请证书），未注入密钥时产出未签名产物。
+# 签名：macOS 侧已落地 ad-hoc 签名（tauri.conf.json 的 bundle.macOS.signingIdentity = "-"），
+# 签名结构自洽、Gatekeeper 判「未验证的开发者」，可点「仍要打开」放行；不公证（本仓库无 Apple 证书）。
+# Windows 侧无签名，走 SmartScreen 的「仍要运行」。详见验证报告 §9.7 与 README「macOS 首次启动」。
 on:
   push:
     branches: [main]
@@ -75,10 +77,12 @@ jobs:
 
       - run: npm ci
 
-      # 签名与公证只预留配置位（环境变量注入），未注入时产物未签名。
-      # 注意：2026-09-16 在本机实测两个 macOS 产物均过不了签名校验（arm64 缺 _CodeSignature、
-      # x64 完全没有签名且 spctl 判 rejected），因此「首次启动需右键打开」这条承诺**未经真机验证**，
-      # 别把它当已知可用 —— 详见验证报告 §9.5 与 manual-qa.md 执行记录 A 的偏差栏。
+      # 签名：macOS 的 ad-hoc 签名已在 tauri.conf.json 落地（signingIdentity = "-"）。
+      # 2026-09-16 实测两架构产物 codesign --verify 均为 0、spctl 判干净 rejected
+      # （修复前 arm64 缺 _CodeSignature、会落进「已损坏」类别）—— 详见验证报告 §9.7。
+      # 公证仍只预留配置位（环境变量注入），未注入时不做公证。
+      # 非本平台的 bundle 目标会被跳过（本机实测：config 的 targets 含 nsis，macOS 上只出 dmg 且不报错）；
+      # 万一某个 runner 报「不支持的目标」，用 `--bundles dmg` / `--bundles nsis` 显式覆盖即可。
       - run: npm run tauri:build
 
       - uses: actions/upload-artifact@v4
