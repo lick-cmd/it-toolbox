@@ -13,13 +13,16 @@ import {
 } from './ulid'
 
 /**
- * 只替换 randomBytes：默认转发真实实现，需要时按标记返回全 0xff。
+ * 只替换 randomBytes：默认转发真实实现，需要时按标记返回全 0xff 或一组固定字节。
  * 溢出分支（80 位随机段全满）在真实随机下需要 2^80 次生成才可能触发，
  * 不引入这个可控入口就只能是一条永远不被执行的死代码。
  */
 // vi.mock 的工厂函数会被提升到文件顶部，引用普通顶层变量会抛「Cannot access before
 // initialization」—— 用 vi.hoisted 显式提升这份状态。
-const mockRandom = vi.hoisted(() => ({ allBytesFull: false }))
+const mockRandom = vi.hoisted(() => ({
+  allBytesFull: false,
+  fixedBytes: null as number[] | null,
+}))
 
 vi.mock('../random', async (importOriginal) => {
   const actual = await importOriginal<typeof RandomModule>()
@@ -27,6 +30,7 @@ vi.mock('../random', async (importOriginal) => {
     ...actual,
     randomBytes: (length: number) => {
       if (mockRandom.allBytesFull) return new Uint8Array(length).fill(0xff)
+      if (mockRandom.fixedBytes) return new Uint8Array(mockRandom.fixedBytes)
       return actual.randomBytes(length)
     },
   }
@@ -34,6 +38,7 @@ vi.mock('../random', async (importOriginal) => {
 
 beforeEach(() => {
   mockRandom.allBytesFull = false
+  mockRandom.fixedBytes = null
   __resetUlidStateForTests()
 })
 
@@ -146,7 +151,48 @@ describe('generateUlids', () => {
   })
 })
 
+/**
+ * 外部实现互操作。
+ *
+ * 前两个 describe 的用例都用「本模块的 encode + 本模块的 decode」自校，对称的错误
+ * （例如整段改成小端）可以双双通过。这两条用模块外的权威事实钉住编码方向。
+ */
+describe('与外部实现互操作', () => {
+  it('1469918176385ms 的时间部分编码为 01ARYZ6S41（ulid/javascript 示例 01ARYZ6S41TSV4RRFFQ69G5FAV 的前 10 字符）', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_469_918_176_385)
+
+    const [ulid] = generateUlids({ count: 1 })
+
+    expect(ulid!.slice(0, 10)).toBe('01ARYZ6S41')
+  })
+
+  it('随机段按 MSB first 编码：固定 10 字节产出确定的 16 字符', () => {
+    // 期望值由模块外的独立工具算出（spec「BINARY LAYOUT AND BYTE ORDER」要求每个分量
+    // 按 MSB first / network byte order 编码）：
+    //   AL = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
+    //   v  = int.from_bytes(bytes, 'big')
+    //   out = ''.join(AL[(v >> 5 * i) & 31] for i in reversed(range(16)))
+    // 缺这条用例时，把 encodeRandom 改成小端仍能通过其余全部用例（定长小端同样保序）。
+    vi.spyOn(Date, 'now').mockReturnValue(1_469_918_176_385)
+    mockRandom.fixedBytes = [0x0f, 0x1e, 0x2d, 0x3c, 0x4b, 0x5a, 0x69, 0x78, 0x87, 0x96]
+
+    const [ulid] = generateUlids({ count: 1 })
+
+    expect(ulid).toBe('01ARYZ6S411WF2TF2BB9MQH1WP')
+  })
+})
+
 describe('decodeUlidTimestamp', () => {
+  it('时间部分超出 48 位时返回 null（10 个字符承载 50 位）', () => {
+    expect(decodeUlidTimestamp('ZZZZZZZZZZ0000000000000000')).toBeNull()
+  })
+
+  it('spec 的最大合法 ULID 前缀 7ZZZZZZZZZ 解码为 2^48 - 1', () => {
+    // ulid/spec：最大合法 ULID 是 7ZZZZZZZZZZZZZZZZZZZZZZZZZ，对应 epoch 时间
+    // 281474976710655（2^48 - 1）。这条同时钉住「边界值必须被接受」与「大端解码」。
+    expect(decodeUlidTimestamp('7ZZZZZZZZZ0000000000000000')).toBe(281_474_976_710_655)
+  })
+
   it('长度或字符非法时返回 null', () => {
     expect(decodeUlidTimestamp('')).toBeNull()
     expect(decodeUlidTimestamp('01ARZ3NDEKTSV4RRFFQ69G5FA')).toBeNull() // 25 字符
@@ -154,8 +200,8 @@ describe('decodeUlidTimestamp', () => {
     expect(decodeUlidTimestamp('I1ARZ3NDEKTSV4RRFFQ69G5FAV')).toBeNull()
   })
 
-  it('时间部分超出 48 位时返回 null（10 个字符承载 50 位）', () => {
-    expect(decodeUlidTimestamp('ZZZZZZZZZZ0000000000000000')).toBeNull()
+  it('非字符串输入返回 null 而不是抛错（工具层直接传入控件文本）', () => {
+    expect(decodeUlidTimestamp(null as unknown as string)).toBeNull()
   })
 
   it('大小写都能解码', () => {
