@@ -147,5 +147,19 @@
   → 教训：**「quarantine 应用能否启动」不能用「直接 exec + 存活探测」判定**，会被 App Translocation 干扰。必须走 Finder 双击 / 右键打开，并由人观察对话框。该转译实例（我自己的测试残留）已清理；`/Applications/IT Toolbox.app` 的另一个实例（`Arch=x86_64`，Spotlight 启动）非本轮产生，未触碰。
 
 - **手工待办（脚本无法替代，需有屏幕的人）**：对带 quarantine 的副本做 ①双击 ②右键→打开，记录对话框**原文**是「已损坏，无法打开，应将它移到废纸篓」还是「未验证的开发者 ＋ 仍要打开」，以及最终能否启动。这是设计文档 `:437` 那句承诺的**唯一**验收方式，目前仍为**未验证**。
+- **手工结果（2026-09-16，执行人实测）**：`/tmp/it-toolbox-manual/` 下的带 quarantine 副本**无法打开**（执行人随后删除了样本）。
+  - **仍未判定**：①对话框**原文**未记录 —— 「已损坏（无解，只能移废纸篓）」与「未验证的开发者（有『仍要打开』）」是两条完全不同的分叉；②是否尝试过**右键→打开**未记录。因此设计文档 `:437` 的承诺既未被证实、也未被证伪。
+  - 取证方法的坑（本次踩过）：样本放在 `/tmp`，重启即失效；且重测必须用**新的** quarantine 时间戳，否则 `syspolicyd`/LaunchServices 的既有判定缓存会污染结果。重测请按本节命令重新生成。
+- **脚本侧复现（同日追加）**：用 `open "<app>"`（与 Finder 双击**同一条** LaunchServices 路径）复核带 quarantine 的 `arm64-原始`：`open` 退出码 0 但**没有任何实例启动**；同秒 `syspolicyd` 日志给出 `[com.apple.syspolicy.exec] Terminating process due to Gatekeeper rejection`（**原因字段被系统打成 `<private>`，日志层读不到文字** —— 所以对话框原文无法脚本取证）。同一秒 `CoreServicesUIAgent`（弹框代理）在加载偏好 → **复现成功，弹框确实是它出的**。
+- **三类产物的判定对照（`spctl` 报错文本是「签名坏了」与「只是没签名」的分水岭）**：
+
+  | 样本 | `codesign --verify` | `spctl --assess -vv` 文本 | 对应弹框类别 |
+  | --- | --- | --- | --- |
+  | `arm64-原始` | 1 | `code has no resources but signature indicates they must be present`（**签名结构性损坏**） | **「已损坏，无法打开，应将它移到废纸篓」，没有「仍要打开」** |
+  | `x64-原始` | 1 | `code object is not signed at all` / `rejected, source=no usable signature`（**干净拒绝**） | 「未验证的开发者」＋「仍要打开」可用 |
+  | `arm64-adhoc`（手工补签） | **0**（`valid on disk`、`satisfies its Designated Requirement`） | `rejected`（**无签名级错误**） | 「未验证的开发者」＋「仍要打开」可用 |
+
+- **关键结论：arm64 产物当前状态比「完全未签名」更糟。** 成因是「Apple Silicon 强制 arm64 二进制必须有签名」×「Tauri 未执行 bundle 签名」的叠加：链接器给了主可执行文件一个 adhoc 签名，而 bundle 缺 `_CodeSignature`，签名**结构不自洽** → 落进「已损坏」这个**连『仍要打开』都没有**的类别；反观 x64 完全没签名，反而落在**有**「仍要打开」的「未验证的开发者」类别。**补 adhoc 签名（`codesign --force --sign -`）可把 arm64 从「已损坏」拉回「未验证的开发者」** —— 这是 W10 选项①的实测依据（`codesign --verify` 1→0、`spctl` 报错文本由签名级错误变为干净 rejected）。
+- **仍缺的最后一步（一次双击）**：上表第三列的「弹框类别」是**推断**（由 `codesign` / `spctl` 的判定文本推出，非人眼所见）。要落成结论，需有人双击 `/tmp/it-toolbox-manual/arm64-adhoc`，确认出现的是「未验证的开发者 ＋ 仍要打开」而非「已损坏」。样本在 `/tmp`，重启即失效。
 - **已实测可用的兜底**：`xattr -dr com.apple.quarantine "<app 路径>"` 之后启动正常（本轮两架构的启动冒烟（执行记录 A）正是以此为前提做的）。
 - 复现本次调查的命令要点：C 源码双架构编译 → `codesign -dv` / `--verify` 对比；`xattr -w com.apple.quarantine "<flags>;<hex 时间戳>;Safari;<uuid>"` 构造 quarantine；`lsappinfo list` 观察 `pre-translocationBundlePath` / `parentASN` 来判断「谁启动的、有没有被转译」。

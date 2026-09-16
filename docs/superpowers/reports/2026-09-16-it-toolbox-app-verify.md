@@ -215,7 +215,7 @@
 | **W8** | **注册校验对非法 meta 会多报一条自相矛盾的 `orphan-tool`**（「有 Tool.tsx 但缺少 meta.ts」，而它明明有 meta.ts）：`continue` 跳过了「把该目录从孤儿候选里摘掉」那一步。真实目录结构下不可能出现非法 meta，故这条噪声长期无人发现 | 已修：凡该目录的 meta.ts 存在（含导出非对象的分支）都先从 `toolByDirectory` 摘除；`registry.build.test.ts` 用混合场景（合法 + 非法 + 真孤儿）做回归钉子。**这条是新增用例当场咬出来的，不是读代码读出来的** |
 | **W9** | W6 补断言使 `json-format/Tool.test.tsx` 行号位移（+3 / +6），计划覆盖表里 3 处 `文件:行` 引用随之失效 | 已校准（`275→278`、`299→305`、`321→327`）。**本报告 §5 的 W1/W2 证据行号指向修复前的代码，不回改**（那是 `77e1352` 时的快照），以本节为准 |
 | — | `README.md` 的「单测分两个 project」在新增 `scripts` project 后已不成立 | 已改为三个 project 并说明各自环境 |
-| **W10** | **两个 macOS 产物的签名状态不一致，且都过不了校验**：arm64 是 adhoc/linker-signed 但包内无 `_CodeSignature`（`codesign --verify` 退出码 1）；**x64 连签名都没有**（`code object is not signed at all`，`spctl --assess` 退出码 3 = `rejected, source=no usable signature`）。设计文档 `:437` 承诺「未签名产物首次启动需右键打开」，但该路径**从未验证**；且实测 **arm64 + quarantine ⇒ 直接 exec 被杀（5/5）**，带 quarantine 的副本能否经 Finder 启动仍是未知 | **根因已查明（§9.5.1）**：arm64 的签名来自链接器（Apple Silicon 强制），x64 无此要求；两侧 bundle 层都无签名，因为 `bundle.macOS` 未配 `signingIdentity`、Tauri 跳过了签名步骤 —— 不是 Tauri 缺陷。未改代码。已登记 `manual-qa.md` 执行记录 A 偏差栏 + 执行记录 C。**待决策**：① 补 `signingIdentity: "-"`（adhoc，无需证书）让 bundle 签名有效（实测 verify 1→0，但 spctl 仍 rejected，且不改变 quarantine 下的拦截）；② 或维持现状、在 README 写明「macOS 产物未签名」并给出已实测的兜底 `xattr -dr com.apple.quarantine`；③ 或补 Developer ID + 公证（设计文档明确本 change 不申请证书）。**「右键打开」是否可用需人眼验证后才能写进文档** |
+| **W10** | **两个 macOS 产物的签名状态不一致，且都过不了校验**：arm64 是 adhoc/linker-signed 但包内无 `_CodeSignature`（`codesign --verify` 退出码 1）；**x64 连签名都没有**（`code object is not signed at all`，`spctl --assess` 退出码 3 = `rejected, source=no usable signature`）。设计文档 `:437` 承诺「未签名产物首次启动需右键打开」，但该路径**从未验证**；且实测 **arm64 + quarantine ⇒ 直接 exec 被杀（5/5）**，带 quarantine 的副本能否经 Finder 启动仍是未知 | **根因已查明（§9.5.1）**：arm64 的签名来自链接器（Apple Silicon 强制），x64 无此要求；两侧 bundle 层都无签名，因为 `bundle.macOS` 未配 `signingIdentity`、Tauri 跳过了签名步骤 —— 不是 Tauri 缺陷。未改代码。已登记 `manual-qa.md` 执行记录 A 偏差栏 + 执行记录 C。**待决策（证据已更新）**：① 给 `bundle.macOS` 补 `signingIdentity: "-"`（adhoc，无需证书）—— **实测依据**：手工 `codesign --force --sign -` 后 `codesign --verify` 1→0（`valid on disk` ＋ `satisfies its Designated Requirement`），`spctl` 报错文本由**签名级错误**（`code has no resources but signature indicates they must be present`）变为**干净 rejected**，即把 arm64 从「**已损坏**（无『仍要打开』）」拉回「**未验证的开发者**（有『仍要打开』）」；② 维持现状＋README 写明未签名并给出**已实测**的兜底 `xattr -dr com.apple.quarantine`；③ Developer ID＋公证（设计文档明确本 change 不申请证书）。**注意**：arm64 现状**比「完全未签名」更糟**（x64 未签名反而有『仍要打开』），这是①的现实理由。①收尾需一次人眼双击 `arm64-adhoc` 样本确认弹框类别 |
 
 ### 9.3 本轮门禁（控制器实测）
 
@@ -300,4 +300,16 @@
 
 **已实测可用的兜底**：`xattr -dr com.apple.quarantine "<app 路径>"` 后启动正常（本轮两架构的启动冒烟均以此为前提）。
 
-**仍未验证**：设计文档 `:437` 的「右键打开」在 arm64 上出现的是「仍要打开」还是「已损坏，应移到废纸篓」—— 这需要人眼，脚本无法替代。
+**LS 路径复现**：`open "<app>"`（与 Finder 双击同一条路径）对带 quarantine 的 arm64 原始产物：`open` 退出码 0 但**无任何实例启动**，同秒 `syspolicyd` 记录 `Terminating process due to Gatekeeper rejection`（原因被打成 `<private>`，脚本拿不到文字），`CoreServicesUIAgent` 在加载偏好 → 弹框由它出，**复现成功**。
+
+**判定对照（`spctl` 报错文本区分「签名坏了」与「只是没签名」）**
+
+| 样本 | `codesign --verify` | `spctl --assess -vv` 文本 | 弹框类别（推断） |
+| --- | --- | --- | --- |
+| arm64 原始 | 1 | `code has no resources but signature indicates they must be present`（签名结构性损坏） | **「已损坏…应移到废纸篓」，无「仍要打开」** |
+| x64 原始 | 1 | `not signed at all` / `rejected, source=no usable signature` | 「未验证的开发者」＋「仍要打开」 |
+| arm64 手工补 adhoc | **0**（`valid on disk`、`satisfies its Designated Requirement`） | `rejected`（无签名级错误） | 「未验证的开发者」＋「仍要打开」 |
+
+**关键结论：arm64 产物当前比「完全未签名」更糟。** 「Apple Silicon 强制 arm64 必须有签名」×「Tauri 未做 bundle 签名」叠加后，主可执行文件有链接器的 adhoc 签名、bundle 却缺 `_CodeSignature`，签名**结构不自洽** → 落进「已损坏」这个**连『仍要打开』都没有**的类别；x64 没签名反而落在**有**「仍要打开」的类别。补 adhoc 签名能把 arm64 从「已损坏」拉回「未验证的开发者」，这是 W10 选项①的实测依据。
+
+**仍未验证**：上表第三列是**推断**（由 `codesign`/`spctl` 判定文本推出），落成结论需一次人眼双击 `arm64-adhoc` 样本。执行人已实测「带 quarantine 的副本打不开」并删除样本，但**未记录对话框原文、未说明是否试过「右键→打开」**，故设计文档 `:437` 的承诺既未被证实也未被证伪。此外 `syspolicyd` 把拒绝原因打成 `<private>`，**这条路无法脚本取证**。
