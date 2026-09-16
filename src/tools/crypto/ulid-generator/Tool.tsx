@@ -122,7 +122,8 @@ export default function UlidGeneratorTool() {
         blockingError ? (
           <span className="text-danger">{blockingError.error}</span>
         ) : firstTimestamp === null ? (
-          <span>共 0 条</span>
+          // 解码失败（理论上不该发生）时不能说「共 0 条」：列表可能仍在渲染，那样会自相矛盾
+          <span>共 {rendered.length} 条</span>
         ) : lastTimestamp === null ? (
           <span>时间戳 {formatTimestamp(firstTimestamp)}</span>
         ) : (

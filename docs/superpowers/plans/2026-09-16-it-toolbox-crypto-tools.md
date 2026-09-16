@@ -2634,6 +2634,13 @@ git commit -m "feat(crypto): 实现 Token 生成器工具与 TextInput 原语（
 
 - [ ] **Step 1: 写失败的界面测试**
 
+> **执行期修正（2026-09-16）**：用例数仍是 6，抓到 2 处测试缺陷（其中 1 处与 T7 同源）：
+> 1. **jest-dom 匹配器（同 T7，会复发）**：本任务用了 `toBeInTheDocument`（2 处）与 `toHaveTextContent`，仓库未安装 `@testing-library/jest-dom` ⇒ 必然报 `Invalid Chai property`。按仓库既有约定改为语义等价断言；其中「状态行展示解码出的时间戳」的两条断言合并为一条更结实的断言（`getByText(锚定正则).textContent` 匹配时间戳格式），避免退化成 `toBeDefined()` 这种恒真的写法。
+> 2. **`getByText(/时间戳/)` 会撞车**：Testing Library 按元素的**直接文本节点**匹配，而输入区说明文字里也含「时间戳」二字 ⇒ 状态行 `span` 与输入区 `p` 各命中一次，实测 `Found multiple elements`。改为锚定状态行的正则 `/^共 \d+ 条 · 时间戳 /` —— 断言意图（状态行展示解码时间戳）不变且更精确。
+> 3. **实现侧一处主动加固**：本任务原代码的 `catch` 是静默的（与 T7 修复前的形态相同）。既然 T7 评审已确认「兜底不能静默」这条原则，这里也同样改为把 core 的原因显示出来（`blockingError = paramError ?? generateError`），保持同族工具一致，避免同一类静默空态在另一个工具里重演。
+> 4. 门禁口径：本任务后我的范围为 **35 文件 / 395 用例**（389 + 6）；同刻全量 53 / 619。`registry.test.ts` 的不变式与 `App.test.tsx` 的首项断言均自动通过（后者已在 T7 改为从 `listTools()[0]` 推导，不再随新增工具失效）。
+> 5. **评审反馈（1 处规范缺口 + 3 处漏杀闭环，2 处判为等价变异）**：spec 的「时间戳可解析」明确要求**偏差 ≤ 2 秒**，原用例只查格式 ⇒ 补「把展示文本独立解析回时间再与 `Date.now()` 比对」（变异「解码不参与状态行」实测被杀）。空态分支只在 count=0 时可达而无用例（变异「空态分支不可达」原为漏杀）⇒ 并入数量用例；毫秒 `pad` 写成 1 位原为 ~90% 的 flaky 漏杀 ⇒ 把时钟固定到毫秒位 `007` 使其确定；单调性用例补「整批前 10 字符必须相同」（排除跨毫秒假象）并按建议加 `__resetUlidStateForTests()` 做隔离。`validate` 边界放宽为 `MAX_COUNT*2` 与去掉 `paramIsValid` 依赖经判定为**行为等价变异**（前者由 core 抛同文案、`blockingError` 显示同一条原因；后者在单参数下确实冗余，是给将来加参数预留的守卫），故不补测。另修 1 处 Minor：解码失败分支原写死「共 0 条」，与仍渲染的列表自相矛盾，改为「共 N 条」。
+
 创建 `src/tools/crypto/ulid-generator/Tool.test.tsx`：
 
 ```tsx
