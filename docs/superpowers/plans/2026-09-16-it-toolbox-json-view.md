@@ -139,7 +139,9 @@ describe('buildJsonTree', () => {
     const built = buildJsonTree('{"a":}')
     expect(built.ok).toBe(false)
     if (built.ok) return
-    expect(built.error).toContain('值')
+    // scanner 的错误文案不含固定的「值」字（「值」只出现在 UNCLOSED 分支的 detail 里），
+    // 这里只钉「有错误文案 + 有行号」，不绑具体文案。
+    expect(built.error).not.toBe('')
     expect(typeof built.line).toBe('number')
   })
 
