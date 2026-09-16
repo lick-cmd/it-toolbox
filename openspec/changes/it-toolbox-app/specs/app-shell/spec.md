@@ -86,7 +86,7 @@
 
 1. **结构层**：内容安全策略 SHALL 将 `connect-src` 限定为应用自身的内部通道（Tauri IPC），且 `img-src`、`font-src`、`style-src`、`script-src` SHALL 不包含任何远程来源
 2. **检测层**：开发构建 SHALL 包装 `fetch`、`XMLHttpRequest`、`WebSocket`，任一被调用即抛出错误并在控制台显著提示
-3. **预防层**：构建流水线 SHALL 扫描产物中的远程 URL 字面量，发现即令构建失败
+3. **预防层**：构建流水线 SHALL 扫描产物中的网络 API 调用（`fetch` / `XMLHttpRequest` / `WebSocket`），发现即令构建失败；远程 URL 字面量 SHALL 只产生告警（React 每次构建都会注入 `https://react.dev/errors/` 之类的常量，按字面设为致命会使构建恒红）
 4. **交互层**：见「外部链接与远程资源处理」
 
 #### Scenario: 断网使用全部工具
@@ -111,8 +111,8 @@
 
 #### Scenario: 构建产物扫描
 
-- **WHEN** 构建流水线扫描产物并发现远程 URL 字面量
-- **THEN** 构建失败并指出该 URL 所在位置
+- **WHEN** 构建流水线扫描产物并发现网络 API 调用（`fetch` / `XMLHttpRequest` / `WebSocket`）
+- **THEN** 构建失败并指出该调用所在的位置；发现远程 URL 字面量只告警，不使构建失败
 
 #### Scenario: 禁止声明式外发
 

@@ -12,7 +12,7 @@ base-ref: f4497ace919e563ab43433da2a8b7c1bb3b09dc2
 
 **Architecture:** 四层单向依赖（`app` → `framework` → `tools` → `core`）。算法全部落在 `core/` 的纯函数里（零 React / 零 Tauri / 零 DOM），可在 Node 中毫秒级测试；呈现由 `framework/` 兜底，使单个工具的实现量趋近于零。工具通过 `meta.ts`（同步元数据）+ `Tool.tsx`（懒加载组件）两文件声明，由 `import.meta.glob` 自动注册，无中心清单。
 
-**Tech Stack:** Tauri 2.11 · React 19.3 · TypeScript 7.0 · Vite 8.3 · Vitest 5.0 · Tailwind CSS 4.3 · js-yaml 5.4 · markdown-it 15.0 · qrcode 1.5
+**Tech Stack:** Tauri 2.11 · React 19.3 · TypeScript 6.0.3 · Vite 8.3 · Vitest 5.0 · Tailwind CSS 4.3 · js-yaml 5.4 · markdown-it 15.0 · qrcode 1.5
 
 **Spec:** `docs/superpowers/specs/2026-09-15-it-toolbox-design.md`
 
@@ -476,7 +476,7 @@ Expected: 两者均无错误退出。`dist/` 被生成。
 git add -A
 git commit -m "chore: 搭建前端工程脚手架并引入 Result 类型
 
-- Vite 8 + React 19 + TypeScript 7 + Tailwind 4
+- Vite 8 + React 19 + TypeScript 6 + Tailwind 4
 - Vitest 5 双项目配置：core(node) / ui(jsdom)
 - 锁定依赖主版本；js-yaml@5 与 markdown-it@15 自带类型，不再安装 @types/*
 - core/result.ts：解析类操作的统一返回类型，含三定位与错误码字段"
