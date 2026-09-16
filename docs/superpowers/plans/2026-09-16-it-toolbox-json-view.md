@@ -917,8 +917,13 @@ export function JsonCode({ value, label, className }: JsonCodeProps) {
             <li key={`${index}-${line.length}`} className="flex gap-2.5 px-2.5">
               <span className="w-9 shrink-0 text-right text-muted select-none">{index + 1}</span>
               <span data-testid="json-code-line" className="whitespace-pre-wrap break-all">
-                {line.map((segment) => (
-                  <span key={`${segment.className}-${segment.text}`} className={segment.className || undefined}>
+                {line.map((segment, segmentIndex) => (
+                  // 片段下标必须入 key：同一行内相同标点（如多个 `:`）的 className+text 会重复，
+                  // 只用后两者会让 React 报「Encountered two children with the same key」。
+                  <span
+                    key={`${segmentIndex}-${segment.className}-${segment.text}`}
+                    className={segment.className || undefined}
+                  >
                     {segment.text}
                   </span>
                 ))}
@@ -961,7 +966,13 @@ function toLines(segments: readonly Segment[]): Segment[][] {
         lines.push(current)
         current = []
       }
-      if (parts[index] !== '') current.push({ text: parts[index], className: segment.className })
+      // 先取出再判空：`noUncheckedIndexedAccess` 下 `parts[index]` 是 `string | undefined`，
+      // 且 `index` 是可变的 `let`，`parts[index] !== ''` 无法把后续的 `parts[index]` 收窄为
+      // `string`，内联写法会报 TS2322。`split('\n')` 的元素必为字符串，故判 undefined 不改变行为。
+      const part = parts[index]
+      if (part !== undefined && part !== '') {
+        current.push({ text: part, className: segment.className })
+      }
     }
   }
 
