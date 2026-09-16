@@ -102,7 +102,7 @@
   - arm64：`codesign --verify` 退出码 **1** —— `code has no resources but signature indicates they must be present`（adhoc / linker-signed，包内无 `_CodeSignature`）；`spctl --assess` 退出码 **1**，同一消息。
   - x64：`codesign --verify` 退出码 **1** —— **`code object is not signed at all`**；`spctl --assess` 退出码 **3** —— **`rejected`，`source=no usable signature`**。
   - 影响：本机（无 quarantine）直跑不受影响，但**「分发给他人后首次启动」这条路径未经任何验证**。设计文档 `:437` 承诺「未签名/未公证产物首次启动需右键打开」——该承诺对 arm64 能否成立、对**完全未签名的 x64** 是否成立（很可能提示为「已损坏」而非「未验证的开发者」），**都未验证，不应视为已知可用**。
-  - 定性：`tauri.conf.json` 的 `bundle.macOS` 只有 `minimumSystemVersion`、**没有 `signingIdentity`**，故「未签名」属预期配置；但 **x64 连 adhoc 签名都没有**是交叉编译路径的实现事实，与设计意图无关，属产物级差异。
+  - 定性：`tauri.conf.json` 的 `bundle.macOS` 只有 `minimumSystemVersion`、**没有 `signingIdentity`**，故「未签名」属预期配置；但 **x64 连 adhoc 签名都没有**是实现事实，与设计意图无关，属产物级差异 —— **根因已在「执行记录 C」查清**（链接器行为，非 Tauri 行为）。
 
 ### 执行记录 B —— `9.3` 运行期零出网旁证（**不构成 `9.3` 完成**）
 
@@ -112,3 +112,40 @@
 - **局限（必须与结论同时看）**：① 只覆盖「启动后静止」这一个窗口，**17 个工具的典型操作一个都没做**（那是 `9.3` 的主体）；② `lsof` 是瞬时快照，建立后立即关闭的连接可能漏掉；③ 未断网、未抓包（`nettop` 无 `sudo` 时只输出表头，未取到按进程流量）。
 - 结论：比「CSP + 静态扫描」更强、但**仍不足**的旁证。`9.3` 保持「未执行」。
 - **复现陷阱（留给下次执行的人）**：`zsh` 不对未加引号的变量做分词，`for pid in $NEW` 会把多个 PID 当成**一个**参数传给 `lsof` → `lsof` 报「无此进程」而输出为空 → 得到「0 个 socket」的**假绿**。本轮踩过两次，最终改用 `bash -c`（或 `${=NEW}`）强制分词，并加 `ps -p <pid>` 有效性校验后才计入结论。这个坑对「0 出网」这类**结论依赖空输出**的检查尤其危险：假绿与真绿长得一模一样。
+
+### 执行记录 C —— macOS 签名根因与 quarantine 专项（2026-09-16，脚本化）
+
+- 目的：查清「执行记录 A」偏差栏里两个产物签名状态不一致的根因，并判断「分发给他人后首次启动」是否可行。
+- **方法 1（决定性实验）**：同一份 C 源码，只换架构，看链接器是否自动签名。
+
+  | 编译命令 | 签名（`codesign -dv`） | `codesign --verify` |
+  | --- | --- | --- |
+  | `cc -arch arm64 -o t-arm64 t.c` | `CodeDirectory v=20400 ... flags=0x20002(adhoc,linker-signed)`、`Signature=adhoc` | **0** |
+  | `cc -arch x86_64 -o t-x86_64 t.c` | 无任何签名（`not signed at all`） | **1** |
+
+  → **根因确定**：Apple Silicon 要求 arm64 二进制必须持有签名才能执行，链接器因此自动打 adhoc 签名；x86_64 无此要求，链接器不签。**与 Tauri 无关** —— 两侧的 **bundle 层**都没有签名，因为 `bundle.macOS` 没有 `signingIdentity`，Tauri 的整个签名步骤被跳过（两份打包日志里 `codesign` / `signing` **零次**出现）。这也解释了 arm64 那句 `code has no resources but signature indicates they must be present`：主可执行文件有（链接器的）签名，而 bundle 缺 `_CodeSignature`。
+
+- **方法 2**：手工补 adhoc 签名，验证「签名无效」能否修成「签名有效」。
+  - `codesign --force --sign - <app>` 两架构均成功；`codesign --verify` **1 → 0**，`_CodeSignature/CodeResources` 出现，`Identifier` 由链接器的 `it_toolbox-8e0a1fed3f352069` 变为 bundle id `ai.it-toolbox.desktop`。
+  - 但 `spctl --assess` **仍 exit 3**（Gatekeeper 不信任 adhoc），且**签名变有效并不足以让 quarantine 下的 arm64 副本变成可运行**（见下）。
+
+- **方法 3**：quarantine × 架构 × 是否重签 的对照矩阵（quarantine 分别打在 `.app` 目录 / `.app`+可执行文件）。
+
+  | 变体 | quarantine | 直接 exec 结果 |
+  | --- | --- | --- |
+  | adhoc-arm64 | 无 | 存活（对照组，符合预期） |
+  | adhoc-arm64 | `.app` / `.app`+bin | 被杀(137) / 被杀(137) |
+  | 原产物-arm64 | `.app` / `.app`+bin | 被杀(137) / 被杀(137) |
+  | adhoc-x64 | 无 | 被杀(137) ← **对照组失败** |
+  | adhoc-x64 | `.app` / `.app`+bin | 被杀(137) / 存活 |
+  | 原产物-x64 | `.app` / `.app`+bin | 存活 / 被杀(137) |
+
+  - **只取一致的那条**：**arm64 + quarantine ⇒ 无法启动（`Killed: 9`，退出码 137，5/5 一致）**。
+  - x64 各行**互相矛盾**（同一条件重复跑出相反结果，连「无 quarantine」的对照组都被杀），**一个都不采用**。
+
+- **为什么 x64 那几行不可信（本轮第三个测量陷阱，已查明）**：直接 exec 一个**带 quarantine 的 `.app` 内**的可执行文件时，macOS 会做 **App Translocation** —— 把进程转译到只读目录**另行启动**（PPID=1）。`lsappinfo` 抓到了现行：`pre-translocationBundlePath=/private/tmp/qa-mx/original-x64/IT Toolbox.app`、`originalPid` 与转译后 PID 相同。此时「`kill -0 $P` 说存活」指的是**被转译后跑起来的那个进程**，而不是我 exec 的那个 —— 于是「存活」被我误读成「Gatekeeper 放行了」。该转译实例实测连续运行 1 分钟以上（`Arch=x86_64`、`type="Foreground"`），**全程没有任何对话框**。
+  → 教训：**「quarantine 应用能否启动」不能用「直接 exec + 存活探测」判定**，会被 App Translocation 干扰。必须走 Finder 双击 / 右键打开，并由人观察对话框。该转译实例（我自己的测试残留）已清理；`/Applications/IT Toolbox.app` 的另一个实例（`Arch=x86_64`，Spotlight 启动）非本轮产生，未触碰。
+
+- **手工待办（脚本无法替代，需有屏幕的人）**：对带 quarantine 的副本做 ①双击 ②右键→打开，记录对话框**原文**是「已损坏，无法打开，应将它移到废纸篓」还是「未验证的开发者 ＋ 仍要打开」，以及最终能否启动。这是设计文档 `:437` 那句承诺的**唯一**验收方式，目前仍为**未验证**。
+- **已实测可用的兜底**：`xattr -dr com.apple.quarantine "<app 路径>"` 之后启动正常（本轮两架构的启动冒烟（执行记录 A）正是以此为前提做的）。
+- 复现本次调查的命令要点：C 源码双架构编译 → `codesign -dv` / `--verify` 对比；`xattr -w com.apple.quarantine "<flags>;<hex 时间戳>;Safari;<uuid>"` 构造 quarantine；`lsappinfo list` 观察 `pre-translocationBundlePath` / `parentASN` 来判断「谁启动的、有没有被转译」。
