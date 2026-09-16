@@ -171,6 +171,35 @@ export function SegmentedControl<T extends string>({
   )
 }
 
+/** 一次性动作按钮。类名沿用 CopyButton 的约定，保证工具栏内高度与圆角一致。 */
+export function Button({
+  children,
+  onClick,
+  disabled,
+  variant = 'primary',
+}: {
+  children: ReactNode
+  onClick: () => void
+  disabled?: boolean
+  variant?: 'primary' | 'ghost'
+}) {
+  const tone =
+    variant === 'primary'
+      ? 'bg-accent text-white hover:opacity-90'
+      : 'text-muted hover:bg-surface-2 hover:text-fg'
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`inline-flex h-6 items-center gap-1 rounded-sm px-2 text-[12px] disabled:opacity-40 ${tone}`}
+    >
+      {children}
+    </button>
+  )
+}
+
 export function ToolbarRow({ children }: { children: ReactNode }) {
   return <div className="flex flex-wrap items-center gap-x-3 gap-y-2">{children}</div>
 }
