@@ -73,6 +73,7 @@ openspec/changes/it-toolbox-app/tasks.md  【改】10.1–10.10 勾选
 ```ts
 import { describe, expect, it } from 'vitest'
 import { buildJsonTree, keyText, valueText, type JsonTreeNode } from './tree'
+import { jsonChildPath } from './type-hints'
 
 /** 用例里反复要「按 path 找节点」，单独抽出来避免每处都写一遍递归 */
 function nodeAt(root: JsonTreeNode, path: string): JsonTreeNode | null {
@@ -155,11 +156,12 @@ describe('buildJsonTree', () => {
   })
 
   it('深度超限时，被跳过的子树不会让祖先原文串位', () => {
-    // 上限那一层的内容分别是空容器与标量：都不以开括号开头，
-    // 正是「跳过子树时按括号配对」最容易数错、把游标吃到流末尾的情形。
+    // 上限那一层的内容分别是空容器、标量与「含内层容器 + 尾随标量」：
+    // 都不以单个开括号一路配平，正是「跳过子树时按括号配对」最容易数错的情形。
     for (const source of [
       '['.repeat(257) + '{}' + ']'.repeat(257),
       '['.repeat(257) + '1' + ']'.repeat(257),
+      '['.repeat(257) + '[1],2' + ']'.repeat(257),
     ]) {
       const built = buildJsonTree(source)
       expect(built.ok).toBe(true)
@@ -171,8 +173,31 @@ describe('buildJsonTree', () => {
       // 到达上限的那一层仍然建了节点；它的下一层被跳过，不建节点
       const capped = `$${'[0]'.repeat(256)}`
       expect(nodeAt(built.value.root, capped)?.raw).toBe(`[${source.slice(257, -257)}]`)
-      expect(nodeAt(built.value.root, `${capped}[0]`)).toBeUndefined()
+      // nodeAt 的签名是 JsonTreeNode | null，取不到时返回 null（不是 undefined）
+      expect(nodeAt(built.value.root, `${capped}[0]`)).toBeNull()
     }
+  })
+
+  it('键序跟源码走，不跟 Object.keys 的整数键重排', () => {
+    const built = buildJsonTree('{"1":"x","0":"y"}')
+    expect(built.ok).toBe(true)
+    if (!built.ok) return
+
+    expect(built.value.root.raw).toBe('{"1":"x","0":"y"}')
+    // 子节点顺序 = 源码顺序
+    expect(built.value.root.children.map((child) => child.key)).toEqual(['1', '0'])
+    // 每个键配到的原文是它自己那一对
+    expect(nodeAt(built.value.root, jsonChildPath('$', '1'))?.raw).toBe('"x"')
+    expect(nodeAt(built.value.root, jsonChildPath('$', '0'))?.raw).toBe('"y"')
+  })
+
+  it('重复键不吞掉后面的 token', () => {
+    const built = buildJsonTree('{"a":1,"a":2}')
+    expect(built.ok).toBe(true)
+    if (!built.ok) return
+
+    expect(built.value.root.raw).toBe('{"a":1,"a":2}')
+    expect(built.value.root.childCount).toBe(2)
   })
 })
 
@@ -301,8 +326,9 @@ export function buildJsonTree(text: string): Result<JsonTreeModel> {
   let cursor = 0
   let nodeCount = 0
 
-  // 文本已通过 RFC 8259 校验，token 形状与值结构必然对齐；越界读取兜成空串，
-  // 只为不让界面吃到异常（值驱动与 token 驱动一旦错位，宁可少上一点色）。
+  // 结构取值、文本取 token。两者并非天然对齐：**键序必须由 token 流决定** ——
+  // `Object.keys` 会把 "1" 这类整数样键排到前面，且重复键只保留最后一个，
+  // 照它迭代会让 raw 与键整体错位。越界读取兜成空串，只为不让界面吃到异常。
   const rawAt = (index: number): string => tokens[index]?.raw ?? ''
 
   const skipIf = (raw: string): void => {
@@ -351,17 +377,24 @@ export function buildJsonTree(text: string): Result<JsonTreeModel> {
 
     if (type === 'object') {
       const record = value as Record<string, unknown>
-      const keys = Object.keys(record)
-      childCount = keys.length
       cursor++ // '{'
       if (depth < TREE_MAX_DEPTH) {
-        for (const childKey of keys) {
+        // 键序由 token 流决定，**不能**用 Object.keys 迭代：它会把 "1" 这类整数样键
+        // 排到前面，且重复键只保留最后一个 —— 照它迭代会让 path 与 raw 整体错位。
+        // 值仍按键从解析结果取（`JSON.parse` 的语义：重复键取最后一个）。
+        while (cursor < tokens.length && rawAt(cursor) !== '}') {
+          const keyRaw = rawAt(cursor)
+          const childKey = JSON.parse(keyRaw) as string
           cursor++ // 键字符串
           cursor++ // ':'
           children.push(walk(record[childKey], childKey, jsonChildPath(path, childKey), depth + 1))
+          childCount++
           skipIf(',')
         }
       } else {
+        // 上限层不下钻，只能在值对象上取键数（与数组分支的 items.length 同口径）；
+        // 无重复键时它等于源码里的键对数。
+        childCount = Object.keys(record).length
         skipSubtree()
       }
       cursor++ // '}'
