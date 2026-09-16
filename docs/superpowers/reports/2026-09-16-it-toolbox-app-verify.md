@@ -326,4 +326,25 @@
 - **签名状态与 §9.5 完全一致**（arm64 仍是链接器 adhoc、bundle 无 `_CodeSignature`；x64 仍完全未签名）—— W10 尚未处置，本轮**未改签名配置**。
 - **「改动确实在包里」的取证**：`Contents/Resources/` 只有 `icon.icns`，Tauri 把前端资源**内嵌并压缩**，故「在二进制里 grep 字符串」这条找法**不适用**（实测 grep 不到，不代表功能没进去）；改用对账法 —— `dist/assets/JsonCode-*.js` 含 `json-code-fold-bar` 与明文「全部折叠」，且 **dmg 内二进制与构建产物 hash 完全一致**（arm64 `d3bbf46816d84c7b…`、x64 `360371b91ad5a1ea…`），而该构建的前端由 `b64c5bf` 重建。
 - **本轮门禁**（提交前实测）：单测 **71 文件 / 887 用例全过**、`tsc --noEmit` 通过、`eslint .` 通过、`npm run build` 通过且外发扫描仍为 **0 处网络 API**。验证期间对 8 个改动文件做前后 `shasum` 比对，**指纹一致**（未被并行改动污染）。
+- **测法更正（重要）**：本轮用 `open`（与 Finder 双击同路径）复核时出现过一次「退出码 0 但无实例」，**0/4 未能复现**（3 个全新路径出实例耗时 77 / 75 / 83 ms）。同时校正：**无 quarantine 时两架构的原始产物都能双击启动**（本轮 7/7），签名结构问题**只在带 quarantine 时致命**；§9.5.1 中「无实例」那半个观测据此降级为**辅助**，其结论只以 `syspolicyd` 拒绝日志为凭。
 - **遗留**：UI 层折叠交互未人眼验证；`9.4` 的 Windows 两架构、`9.6`、`9.10` 仍缺 Windows 环境；W10 的「右键打开」分叉仍待一次人眼双击。
+
+### 9.7 W10 ① 落地：ad-hoc 签名修复与验收（2026-09-16）
+
+- **决策**：执行人确认 ① 的目标类别（手工补签样本的双击弹框为「未验证的开发者＋仍要打开」），据此改动**一个字段**：`src-tauri/tauri.conf.json` 的 `bundle.macOS.signingIdentity = "-"`。
+- **构建证据**：`/tmp/build-adhoc.log` 首次出现 `Signing with identity "-"`（**第一版日志里签名动作一次都没出现**），随后 `Signing .../MacOS/it-toolbox`、`Signing .../IT Toolbox.app`、`replacing existing signature`；公证按预期跳过（无 Apple 账号环境变量）。
+- **修复前后（两版产物的同一组命令）**：
+
+  | 检查项 | 修复前 | 修复后 |
+  | --- | --- | --- |
+  | arm64 `codesign --verify` | 1 | **0** |
+  | x64 `codesign --verify` | 1（`not signed at all`） | **0** |
+  | `Identifier` | `it_toolbox-8e0a1fed…`（链接器） | **`ai.it-toolbox.desktop`** |
+  | `flags` | `0x20002(adhoc,linker-signed)` / x64 无 | 均 `0x10002(adhoc,runtime)` |
+  | `_CodeSignature/CodeResources` | 缺 / 无 | **有** |
+  | `spctl` 文本 | arm64 `code has no resources…`（结构性损坏 → 「已损坏」） | **干净 `rejected`**（→「未验证的开发者＋仍要打开」） |
+
+- **带 quarantine 实测**：新 arm64 产物 `verify` 仍 **0**、`spctl` 干净 `rejected`；`open` 被拒，`syspolicyd` 有 `Terminating process due to Gatekeeper rejection`（原因字段 `<private>`，弹框原文无法脚本取证）。
+- **回归**：签名后两架构经 `open` 均正常启动、运行期出网 socket **0**、`lsappinfo` 有 `IT Toolbox Web Content`（WebKit 进程）→ hardened runtime 不影响 WebView；entitlements 为空。
+- **新产物**：`aarch64.dmg` 2.36MB（15:15:12）、`x64.dmg` 2.52MB（15:16:24）。
+- **仍待一条人眼**：新产物带 quarantine 双击的弹框原文（样本 `/tmp/qa3q/IT Toolbox.app`，重启即失效）。

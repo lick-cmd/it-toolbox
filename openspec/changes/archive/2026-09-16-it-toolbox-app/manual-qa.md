@@ -8,7 +8,7 @@
 > **2026-09-16 归档后补充**：`9.4` 的 **macOS 两架构**已在 arm64 本机上真跑完（构建 → 解包 → 启动，含 WebView 与 socket 证据），见文末「执行记录 A」；`9.3` 补上了**运行期**零出网旁证，见「执行记录 B」——**但这不等于 9.3 完成**，它的主体是 17 个工具的逐个操作，未做。
 > `9.6`、`9.10` 以及 `9.4` 的 **Windows 两架构仍未执行**，必须有 Windows / 真机环境。另外本次执行顺带查出一个签名层面的实质问题（见「执行记录 A」的偏差栏）：**x64 产物完全未签名**，`spctl` 评估为 `rejected`。
 >
-> **同日续**：该签名问题已查清根因并做了 quarantine 专项（见「执行记录 C」，含三类产物的判定对照）；此后代码有实质改动（JSON 折叠，提交 `b64c5bf`），产物与代码不再对齐，故**重新打包并复测**，见「执行记录 D」。
+> **同日续**：该签名问题已查清根因并做了 quarantine 专项（见「执行记录 C」，含三类产物的判定对照）；此后代码有实质改动（JSON 折叠，提交 `b64c5bf`），产物与代码不再对齐，故**重新打包并复测**，见「执行记录 D」。签名问题已按 W10 ① 落地修复（`signingIdentity = "-"`）并重新出包，见「执行记录 E」。
 
 ## 0. 共同前置与已有证据
 
@@ -152,7 +152,7 @@
 - **手工结果（2026-09-16，执行人实测）**：`/tmp/it-toolbox-manual/` 下的带 quarantine 副本**无法打开**（执行人随后删除了样本）。
   - **仍未判定**：①对话框**原文**未记录 —— 「已损坏（无解，只能移废纸篓）」与「未验证的开发者（有『仍要打开』）」是两条完全不同的分叉；②是否尝试过**右键→打开**未记录。因此设计文档 `:437` 的承诺既未被证实、也未被证伪。
   - 取证方法的坑（本次踩过）：样本放在 `/tmp`，重启即失效；且重测必须用**新的** quarantine 时间戳，否则 `syspolicyd`/LaunchServices 的既有判定缓存会污染结果。重测请按本节命令重新生成。
-- **脚本侧复现（同日追加）**：用 `open "<app>"`（与 Finder 双击**同一条** LaunchServices 路径）复核带 quarantine 的 `arm64-原始`：`open` 退出码 0 但**没有任何实例启动**；同秒 `syspolicyd` 日志给出 `[com.apple.syspolicy.exec] Terminating process due to Gatekeeper rejection`（**原因字段被系统打成 `<private>`，日志层读不到文字** —— 所以对话框原文无法脚本取证）。同一秒 `CoreServicesUIAgent`（弹框代理）在加载偏好 → **复现成功，弹框确实是它出的**。
+- **脚本侧复现（同日追加）**：用 `open "<app>"`（与 Finder 双击**同一条** LaunchServices 路径）复核带 quarantine 的 `arm64-原始`：`open` 退出码 0 但**没有任何实例启动**（**注意**：「无实例」这半个观测后来**没能复现**，见「执行记录 D」的方法学更正 —— 本条的结论只以 `syspolicyd` 拒绝日志为凭）；同秒 `syspolicyd` 日志给出 `[com.apple.syspolicy.exec] Terminating process due to Gatekeeper rejection`（**原因字段被系统打成 `<private>`，日志层读不到文字** —— 所以对话框原文无法脚本取证）。同一秒 `CoreServicesUIAgent`（弹框代理）在加载偏好 → **复现成功，弹框确实是它出的**。
 - **三类产物的判定对照（`spctl` 报错文本是「签名坏了」与「只是没签名」的分水岭）**：
 
   | 样本 | `codesign --verify` | `spctl --assess -vv` 文本 | 对应弹框类别 |
@@ -187,3 +187,40 @@
 
 - **仍未验证**：① UI 层的折叠交互（点开关、全部折叠/展开的观感）—— 逻辑与 DOM 有单测覆盖，但**没有人眼看过**；② `9.4` 的 Windows 两架构；③ W10 的「右键打开」分叉（同上节）。
 - 清理：`/tmp/qa-v2-arm64`、`/tmp/qa-v2-x64`、挂载点 `/tmp/mnt-*` 与测试进程均已清理（残留自查：无进程、无挂载卷）。
+
+#### D-1 「能不能启动」的测法更正（同日追加，重要）
+
+- **起因**：本轮用 `open "<app>"`（与 Finder 双击同一条 LaunchServices 路径）复核新产物时，出现过一次「`open` 退出码 0 但无实例」，当时差点被写成「启动不了」。**随后 0/4 未能复现**：同一路径重跑、加 3 个全新路径各跑一次，出实例耗时分别为 **77 / 75 / 83 ms**（每次完整走 解包 → `hdiutil detach` → `open` → 0.2s 粒度轮询）。
+- **同轮校正的第二条**：**无 quarantine 时，两架构的原始产物都能经 Finder 双击启动** —— 本轮 **7/7 成功**（四格矩阵 4 + 复现 3），**包括** `codesign --verify` 为 1、`spctl` 报 `code has no resources but signature…` 的 arm64 原始产物。也就是说**签名结构问题只在「带 quarantine」时才致命**（与「执行记录 C」一致），这也解释了 `/Applications` 那份 arm64 副本（同为链接器 adhoc、`verify=1`）为何能正常跑。
+- **测法结论（并入方法库）**：
+  1. 「启动得了吗」**不能用单次 `open` + 固定 sleep 后查进程**来判定 —— 失败必须**重复 ≥3 次**并交叉 `syspolicyd` 日志；**只有日志里的拒绝记录是硬证据**。
+  2. 与已知的两个坑并列：① App Translocation 会让「存活」判错（`lsappinfo` 看 `pre-translocationBundlePath`）；② `pgrep -f` 可能匹配到**自己的命令行**（先拿一个肯定不存在的路径跑自检，确认匹配数为 0 再判定）；③ 本轮新增：**单次启动探测的假阴性**。
+  3. 无 quarantine 的本地副本**能被 `open` 正常拉起** → 「兜底 = 去掉 quarantine」这条路是**实测可用**的（此前只由直接 exec 佐证）。
+
+### 执行记录 E —— W10 ① 落地：ad-hoc 签名修复（2026-09-16）
+
+- **决策依据**：执行人实测手工补签样本 `/tmp/it-toolbox-manual/arm64-adhoc` 双击后的弹框为「未验证的开发者 ＋ 仍要打开」，即 ① 能把 arm64 从「已损坏」类别拉回可放行类别。
+- **改动**：`src-tauri/tauri.conf.json` → `bundle.macOS.signingIdentity = "-"`。**只加这一个字段**，未动其它配置。
+- **构建证据**：`/tmp/build-adhoc.log` 里**首次出现签名动作**（第一版日志一次都没有）：
+  ```
+       Signing with identity "-"
+  Signing .../target/release/bundle/macos/IT Toolbox.app/Contents/MacOS/it-toolbox
+  Signing .../target/release/bundle/macos/IT Toolbox.app
+  .../IT Toolbox.app: replacing existing signature
+          Warn skipping app notarization, no APPLE_ID & ... found
+  ```
+  （公证被跳过是**预期**：本项目没有 Apple 开发者账号，只做 ad-hoc 签名。）
+- **修复前后对照（同一命令，两版产物）**：
+
+  | 检查项 | 修复前 | 修复后 |
+  | --- | --- | --- |
+  | arm64 `codesign --verify` | 1 | **0** |
+  | x64 `codesign --verify` | 1（`not signed at all`） | **0** |
+  | `Identifier` | `it_toolbox-8e0a1fed3f352069`（链接器生成的） | **`ai.it-toolbox.desktop`**（bundle id） |
+  | `flags` | arm64 `0x20002(adhoc,linker-signed)`；x64 无 | 两者均 `0x10002(adhoc,runtime)` |
+  | `_CodeSignature/CodeResources` | arm64 缺、x64 无 | **有** |
+  | `spctl --assess -vv` 文本 | arm64：`code has no resources but signature indicates they must be present`（结构性损坏 → 「已损坏」类别） | **`rejected`**（无签名级错误 → 「未验证的开发者」类别） |
+- **带 quarantine 实测**：新 arm64 产物设 quarantine 后 `codesign --verify` **仍为 0**、`spctl` 文本是干净的 `rejected`；`open` 无实例，`syspolicyd` 记录 `Terminating process due to Gatekeeper rejection`（拒绝原因仍被系统打成 `<private>`，故**弹框原文无法脚本取证**）。
+- **回归检查**：签名后两架构经 `open`（同 Finder 双击）**均正常启动**、**运行期出网 socket 数 0**；`lsappinfo` 里可见 `IT Toolbox Web Content`（WebKit 的 WebContent 进程）→ **hardened runtime 未影响 WKWebView 初始化**；`codesign -d --entitlements -` 为空（Tauri 未附加权限项）。
+- **仍未验证（一条人眼）**：**新产物**带 quarantine 双击的弹框原文。手工补签样本上执行人已确认是「未验证的开发者＋仍要打开」，新产物落在**同一类别**（`spctl` 干净 `rejected`），但严格说**人眼只验过手工样本**。带 quarantine 的新样本留在 `/tmp/qa3q/IT Toolbox.app`（`/tmp` 重启即失效）。
+- **产物**：`IT Toolbox_0.1.0_aarch64.dmg`（15:15:12，2360133 B）、`IT Toolbox_0.1.0_x64.dmg`（15:16:24，2523660 B）。
