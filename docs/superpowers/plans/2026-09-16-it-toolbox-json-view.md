@@ -153,6 +153,27 @@ describe('buildJsonTree', () => {
     // 下钻到上限即止，但节点本身仍在
     expect(nodeAt(built.value.root, '$[0]') !== null).toBe(true)
   })
+
+  it('深度超限时，被跳过的子树不会让祖先原文串位', () => {
+    // 上限那一层的内容分别是空容器与标量：都不以开括号开头，
+    // 正是「跳过子树时按括号配对」最容易数错、把游标吃到流末尾的情形。
+    for (const source of [
+      '['.repeat(257) + '{}' + ']'.repeat(257),
+      '['.repeat(257) + '1' + ']'.repeat(257),
+    ]) {
+      const built = buildJsonTree(source)
+      expect(built.ok).toBe(true)
+      if (!built.ok) return
+
+      // 根节点的原文必须还是整段源码，不能被下游串位污染
+      expect(built.value.root.raw).toBe(source)
+
+      // 到达上限的那一层仍然建了节点；它的下一层被跳过，不建节点
+      const capped = `$${'[0]'.repeat(256)}`
+      expect(nodeAt(built.value.root, capped)?.raw).toBe(`[${source.slice(257, -257)}]`)
+      expect(nodeAt(built.value.root, `${capped}[0]`)).toBeUndefined()
+    }
+  })
 })
 
 describe('keyText / valueText', () => {
@@ -292,11 +313,18 @@ export function buildJsonTree(text: string): Result<JsonTreeModel> {
    * 只在达到深度上限时使用：把整棵子树的 token 消费掉，**停在匹配的闭合符之前**
    * —— 调用方随后那一次 `cursor++` 负责收尾。若在此处吞掉闭合符，父层分隔符
    * 判断会错位，后面所有节点的 raw 都会串位。
+   *
+   * 进入时游标位于容器的**内容**起点（开括号已被调用方消费），所以内容不以开括号
+   * 开头是常态（空容器 `{}`、首元素是标量/键字符串）。此时遇到的第一个闭合符就是
+   * 本节点自己那一个，而 depth 还是 0 —— 必须先停手，否则 depth 会变成 -1 且再也
+   * 回不到 0，循环一路吃到 token 流末尾，该节点与它所有祖先的 raw 全部塌成空串。
    */
   const skipSubtree = (): void => {
     let depth = 0
     while (cursor < tokens.length) {
       const raw = rawAt(cursor)
+      // 停在「本节点自己的闭合符」之前：收尾交给调用方那次 cursor++
+      if ((raw === '}' || raw === ']') && depth === 0) return
       cursor++
       if (raw === '{' || raw === '[') depth++
       else if (raw === '}' || raw === ']') {
@@ -391,7 +419,7 @@ function containerPathsFromDepth(node: JsonTreeNode, fromDepth: number): string[
 - [ ] **Step 4: 跑用例确认通过**
 
 Run: `npx vitest run --project core src/core/json/tree.test.ts`
-Expected: PASS（9 条）。
+Expected: PASS（10 条）。
 
 - [ ] **Step 5: 提交**
 
