@@ -318,19 +318,21 @@ export function buildJsonTree(text: string): Result<JsonTreeModel> {
    * 开头是常态（空容器 `{}`、首元素是标量/键字符串）。此时遇到的第一个闭合符就是
    * 本节点自己那一个，而 depth 还是 0 —— 必须先停手，否则 depth 会变成 -1 且再也
    * 回不到 0，循环一路吃到 token 流末尾，该节点与它所有祖先的 raw 全部塌成空串。
+   *
+   * 回到 0 不再停手：只有「depth 为 0 时遇到的闭合符」才是本节点的收尾点。若在
+   * `depth--` 到 0 时就返回，那么「内容首个元素是容器且其后还有兄弟」时（`[1],2`）
+   * 会在元素自己闭合处提前停手，游标停在逗号上，调用方那次 `cursor++` 会吃掉逗号，
+   * 上限层与全部祖先的 raw 一起串位。
    */
   const skipSubtree = (): void => {
     let depth = 0
     while (cursor < tokens.length) {
       const raw = rawAt(cursor)
-      // 停在「本节点自己的闭合符」之前：收尾交给调用方那次 cursor++
+      // 只有本节点自己的闭合符会以 depth === 0 出现：停在它之前，收尾交给调用方
       if ((raw === '}' || raw === ']') && depth === 0) return
       cursor++
       if (raw === '{' || raw === '[') depth++
-      else if (raw === '}' || raw === ']') {
-        depth--
-        if (depth === 0) return
-      }
+      else if (raw === '}' || raw === ']') depth--
     }
   }
 
@@ -419,7 +421,7 @@ function containerPathsFromDepth(node: JsonTreeNode, fromDepth: number): string[
 - [ ] **Step 4: 跑用例确认通过**
 
 Run: `npx vitest run --project core src/core/json/tree.test.ts`
-Expected: PASS（10 条）。
+Expected: PASS（12 条）。
 
 - [ ] **Step 5: 提交**
 
