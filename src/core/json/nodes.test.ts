@@ -77,10 +77,28 @@ describe('buildJsonNodes', () => {
     }
   })
 
-  it('500 层嵌套不抛异常（与 scanJson 同阶深度）', () => {
-    const deep = '['.repeat(500) + ']'.repeat(500)
-    expect(() => buildJsonNodes(deep)).not.toThrow()
-    expect(buildJsonNodes(deep).ok).toBe(true)
+  it('500 层嵌套下钻到最内层仍存在（无深度上限）', () => {
+    const DEPTH = 500
+    const deep = '['.repeat(DEPTH) + ']'.repeat(DEPTH)
+    const result = buildJsonNodes(deep)
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error(`期望解析成功，实际失败：${result.error}`)
+
+    // 沿 items[0] 一路下钻。若把 tree.ts 的 TREE_MAX_DEPTH 门搬进来，
+    // 256 层之后只会消费 token 不建节点，下钻会提前停在一个空数组上，
+    // 下面的 levels 断言随即变红 —— 深度上限回归无法再静默通过。
+    let node: JsonNode = result.value
+    let levels = 0
+    while (node.kind === 'array' && node.items.length > 0) {
+      const inner = node.items[0]
+      if (inner === undefined) break
+      node = inner
+      levels++
+    }
+
+    expect(levels).toBe(DEPTH - 1)
+    expect(node.kind).toBe('array')
+    expect(node.items).toHaveLength(0)
   })
 })
 

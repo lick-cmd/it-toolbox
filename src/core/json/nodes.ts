@@ -49,6 +49,16 @@ export function buildJsonNodes(text: string): Result<JsonNode> {
 
   const rawAt = (index: number): string => tokens[index]?.raw ?? ''
 
+  /**
+   * 按 token 流前进建节点。
+   *
+   * ⚠️ 本骨架与 `tree.ts:171-206` 的 walk **同构**：`cursor++ // '{'`、`cursor++ // 键`、
+   * `cursor++ // ':'`、`skipIf(',')`、`cursor++ // '}'` 一一对应，注释也逐字相同。
+   * 扫描器 token 语义一旦变更，**两处必须同步修改** —— 漏改任一都会造成「树与原文错位」
+   * 这类静默错误。此处刻意不抽公共 walker：tree.ts 的 walk 与 path / label / summary /
+   * depth / nodeCount / TREE_MAX_DEPTH / skipLayer 等视图记账深度纠缠，合并需侵入那侧；
+   * 二者共享的只是骨架，不是抽象边界（nodes.ts 无路径、无标签、无深度上限）。
+   */
   const walk = (): JsonNode => {
     const token = tokens[cursor]
     if (token === undefined) {
