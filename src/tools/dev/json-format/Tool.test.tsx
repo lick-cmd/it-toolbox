@@ -226,3 +226,13 @@ describe('JSON 美化 —— 大体积输入', () => {
     expect(screen.getByText(/仅显示前 2000 个/)).toBeDefined()
   }, 30000)
 })
+
+describe('JSON 美化 —— 只读视图由框架层着色', () => {
+  it('输出区由框架层着色视图呈现', () => {
+    render(<JsonFormatTool />)
+    // 输出里必须真的有字符串值，否则 `.json-string` 不出现、这条钉子会假红
+    setInput('{"a":"x"}')
+
+    expect(document.querySelector('[data-testid="json-code"] .json-string')).toBeTruthy()
+  })
+})

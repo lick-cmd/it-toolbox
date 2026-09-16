@@ -20,6 +20,23 @@ const setToken = (value: string) => {
   fireEvent.change(screen.getByRole('textbox', { name: 'JWT 令牌' }), { target: { value } })
 }
 
+/**
+ * 只读 JSON 视图每行一个 `<li>`，行内容在最后一个子元素（`data-testid="json-code-line"`）。
+ * 着色后一行被切成多个 token `<span>`，故「整行当一个文本节点」的 `getByText` 写法不再成立，
+ * 改为直接读内容列的 textContent。
+ */
+const jsonLines = (view: HTMLElement): string[] =>
+  Array.from(view.querySelectorAll('[data-testid="json-code-line"]')).map(
+    (line) => line.textContent ?? '',
+  )
+
+/**
+ * 解码成功时有头部与载荷两个 JSON 视图；按 `Tool.tsx` 的渲染顺序，下标 0 是头部、1 是载荷。
+ * 载荷非法 JSON 时只剩头部一个视图（另走 `<pre>`），下标 0 仍是头部。
+ */
+const headerLines = () => jsonLines(screen.getAllByTestId('json-code')[0]!)
+const payloadLines = () => jsonLines(screen.getAllByTestId('json-code')[1]!)
+
 beforeEach(() => {
   localStorage.clear()
 })
@@ -29,8 +46,8 @@ describe('JWT 解析器工具', () => {
     render(<JwtParserTool />)
     setToken(EXPIRED)
 
-    expect(screen.getByText(/"alg": "HS256"/)).toBeDefined()
-    expect(screen.getByText(/"sub": "1"/)).toBeDefined()
+    expect(headerLines()).toContain('  "alg": "HS256",')
+    expect(payloadLines()).toContain('  "sub": "1",')
   })
 
   it('展示原始签名片段', () => {
@@ -106,11 +123,20 @@ describe('JWT 解析器工具', () => {
     )
 
     expect(screen.getByText(/载荷不是合法的 JSON/)).toBeDefined()
-    expect(screen.getByText(/"kid": "k1"/)).toBeDefined()
+    expect(headerLines()).toContain('  "kid": "k1"')
   })
 
   it('空输入时展示空态', () => {
     render(<JwtParserTool />)
     expect(screen.getByText('尚未输入')).toBeDefined()
+  })
+})
+
+describe('JWT 解析器工具 —— 只读视图由框架层着色', () => {
+  it('输出区由框架层着色视图呈现', () => {
+    render(<JwtParserTool />)
+    setToken(EXPIRED)
+
+    expect(document.querySelector('[data-testid="json-code"] .json-string')).toBeTruthy()
   })
 })

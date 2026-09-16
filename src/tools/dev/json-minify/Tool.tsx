@@ -7,6 +7,7 @@ import { CopyButton } from '@/framework/ui/CopyButton'
 import { DownloadButton } from '@/framework/ui/DownloadButton'
 import { EmptyState } from '@/framework/ui/EmptyState'
 import { ErrorNote } from '@/framework/ui/ErrorNote'
+import { JsonCode } from '@/framework/ui/JsonCode'
 
 const INITIAL_STATE = { input: '', options: {} }
 
@@ -71,7 +72,7 @@ export default function JsonMinifyTool() {
                 label="下载"
               />
             </div>
-            <CodeArea value={result.value.output} readOnly label="压缩结果" />
+            <JsonCode value={result.value.output} label="压缩结果" />
           </>
         )
       }

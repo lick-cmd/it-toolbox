@@ -89,3 +89,13 @@ describe('JSON 压缩工具', () => {
     expect(screen.getByRole('button', { name: '下载' })).toBeDefined()
   })
 })
+
+describe('JSON 压缩工具 —— 只读视图由框架层着色', () => {
+  it('输出区由框架层着色视图呈现', () => {
+    render(<JsonMinifyTool />)
+    // 输出里必须真的有字符串值：纯数字/布尔的 JSON 不含 `.json-string`，钉不住这件事
+    setInput('{ "a": "\\u0041\\/" }')
+
+    expect(document.querySelector('[data-testid="json-code"] .json-string')).toBeTruthy()
+  })
+})

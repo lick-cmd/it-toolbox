@@ -9,6 +9,7 @@ import { EmptyState } from '@/framework/ui/EmptyState'
 import { ErrorNote } from '@/framework/ui/ErrorNote'
 import { Field } from '@/framework/ui/Field'
 import { Select } from '@/framework/ui/Inputs'
+import { JsonCode } from '@/framework/ui/JsonCode'
 
 const INITIAL_STATE = {
   input: '',
@@ -76,7 +77,7 @@ export default function YamlToJsonTool() {
               <CopyButton text={converted.value} label="复制全部" />
               <DownloadButton filename="output.json" text={converted.value} />
             </div>
-            <CodeArea value={converted.value} readOnly label="JSON 结果" />
+            <JsonCode value={converted.value} label="JSON 结果" />
           </>
         )
       }

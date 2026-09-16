@@ -47,3 +47,13 @@ describe('YAML 转 JSON 工具', () => {
     expect(screen.getByText('尚未输入')).toBeDefined()
   })
 })
+
+describe('YAML 转 JSON 工具 —— 只读视图由框架层着色', () => {
+  it('输出区由框架层着色视图呈现', () => {
+    render(<YamlToJsonTool />)
+    // 输出里必须真的有字符串值，否则 `.json-string` 不出现、这条钉子会假红
+    setInput('name: toolbox\n')
+
+    expect(document.querySelector('[data-testid="json-code"] .json-string')).toBeTruthy()
+  })
+})

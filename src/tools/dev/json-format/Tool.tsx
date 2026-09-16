@@ -11,6 +11,7 @@ import { DownloadButton } from '@/framework/ui/DownloadButton'
 import { EmptyState } from '@/framework/ui/EmptyState'
 import { ErrorNote } from '@/framework/ui/ErrorNote'
 import { Checkbox, SegmentedControl } from '@/framework/ui/Inputs'
+import { JsonCode } from '@/framework/ui/JsonCode'
 import { Spinner } from '@/framework/ui/Spinner'
 import type { SelectOption } from '@/framework/ui'
 
@@ -217,12 +218,13 @@ export default function JsonFormatTool() {
             ) : (
               <>
                 {preview !== null && preview.total > MAX_PREVIEW_ROWS && (
-                  <p className="border-b border-border px-2.5 py-1 text-[12px] text-warn">
+                  <p className="border-b border-border bg-surface-2 px-2.5 py-1.5 text-[12px] text-warn">
                     输出共 {preview.total} 行，预览仅显示前 {MAX_PREVIEW_ROWS} 行；
+                    预览内容不完整，因此不参与语法着色（着色需要完整合法的 JSON）；
                     复制与下载给的是完整内容。
                   </p>
                 )}
-                <CodeArea value={preview?.text ?? ''} readOnly label="格式化结果" />
+                <JsonCode value={preview?.text ?? ''} label="格式化结果" />
               </>
             )}
           </>

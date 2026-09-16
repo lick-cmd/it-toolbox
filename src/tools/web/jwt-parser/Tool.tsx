@@ -6,6 +6,7 @@ import { CodeArea } from '@/framework/ui/CodeArea'
 import { CopyButton } from '@/framework/ui/CopyButton'
 import { EmptyState } from '@/framework/ui/EmptyState'
 import { ErrorNote } from '@/framework/ui/ErrorNote'
+import { JsonCode } from '@/framework/ui/JsonCode'
 
 /** 必须定义在组件外部：初始值参与 useToolState 的惰性初始化 */
 const INITIAL_STATE = { input: '', options: {} }
@@ -34,7 +35,7 @@ function PartView({ title, part, label }: { title: string; part: JwtPart; label:
           )}
         </div>
       ) : (
-        <CodeArea value={json ?? ''} readOnly label={label} />
+        <JsonCode value={json ?? ''} label={label} />
       )}
     </section>
   )
