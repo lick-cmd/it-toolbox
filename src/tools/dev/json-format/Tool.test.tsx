@@ -294,3 +294,44 @@ describe('树形视图', () => {
     expect(screen.getByRole('button', { name: '展开 $.a' })).toBeTruthy()
   })
 })
+
+describe('树形与源码的一致性', () => {
+  it('树形显示的标量与源码原文逐字符一致（转义不被规范化）', async () => {
+    const user = userEvent.setup()
+    render(<JsonFormatTool />)
+
+    const input = '{"escaped":"\\u0041","expo":1e2}'
+    setInput(input)
+
+    // 源码视图
+    await user.click(screen.getByRole('button', { name: 'JSON' }))
+    const sourceText = Array.from(document.querySelectorAll('[data-testid="json-code-line"]'))
+      .map((line) => line.textContent ?? '')
+      .join('\n')
+    expect(sourceText).toContain('"\\u0041"')
+    expect(sourceText).toContain('1e2')
+
+    // 树形视图：同一个值必须还是原文，不能变成 "A" 或 100
+    await user.click(screen.getByRole('button', { name: '树形' }))
+    expect(screen.getByText('"\\u0041"')).toBeTruthy()
+    expect(screen.getByText('1e2')).toBeTruthy()
+    expect(screen.queryByText('"A"')).toBeNull()
+  })
+
+  it('复制与下载给的是完整原文，不含树形的装饰标记', async () => {
+    const user = userEvent.setup()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    // 本仓先例 `src/framework/clipboard.test.ts:17-19`：jsdom 的 `navigator.clipboard`
+    // 是 getter-only，`Object.assign(navigator, …)` 会抛 TypeError，故用 `vi.stubGlobal`。
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+
+    render(<JsonFormatTool />)
+    setInput('{"a":{"b":1}}')
+    await user.click(screen.getByRole('button', { name: '树形' }))
+    await user.click(screen.getByRole('button', { name: '复制' }))
+
+    await vi.waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith('{\n  "a": {\n    "b": 1\n  }\n}')
+    })
+  })
+})
