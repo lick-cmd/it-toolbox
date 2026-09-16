@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ToolEntry } from '@/framework/registry'
+import { listTools, type ToolEntry } from '@/framework/registry'
 import { __resetPrefsForTests, type RecentEntry } from '@/framework/usePrefs'
 import { App, resolveLandingToolId } from './App'
 
@@ -83,13 +83,19 @@ describe('App', () => {
 
   it('落地到注册表首项：标题与工具界面都渲染出来', async () => {
     render(<App />)
-    // 侧栏里也有工具名，但 h1 只存在于主面板 ⇒ 该断言能区分「落地失败」
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('UUID 生成器')
+    // 侧栏里也有工具名，但 h1 只存在于主面板 ⇒ 该断言能区分「落地失败」。
+    // 首项由注册表顺序决定，不写死具体工具：本计划 T7 插入 token-generator 后首项已变，
+    // 写死名字会让「后续每加一个排序在前的工具」都撞一次。
+    const first = listTools()[0]
+    expect(first).toBeDefined()
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(first?.meta.name)
 
-    const main = screen.getByRole('main')
+    // 懒加载的组件真的挂载了：改用确定性工具取证 —— 点侧栏进入 UUID 生成器，
+    // 等它自己的按钮出现（首项的控件形状会随首项变化，不适合做证据）。
+    await userEvent.click(screen.getByRole('button', { name: 'UUID 生成器' }))
     await waitFor(() => {
       // 工具自身的按钮出现了 ⇒ 懒加载的组件真的挂载了
-      expect(within(main).getByRole('button', { name: '重新生成' })).toBeDefined()
+      expect(within(screen.getByRole('main')).getByRole('button', { name: '重新生成' })).toBeDefined()
     })
   })
 
@@ -173,7 +179,8 @@ describe('App', () => {
     render(<App />)
     await userEvent.click(screen.getByRole('button', { name: /搜索/ }))
 
-    const textbox = screen.getByRole('textbox')
+    // 限定在弹出层内：着陆的工具自身也可能带文本框（T7 的 Token 生成器有「前缀」）
+    const textbox = within(screen.getByRole('dialog', { name: '搜索工具' })).getByRole('textbox')
     expect(document.activeElement).toBe(textbox)
 
     await userEvent.keyboard('{Meta>}k{/Meta}')
@@ -187,7 +194,12 @@ describe('App', () => {
   it('真实注册表下按中文关键词命中工具', async () => {
     render(<App />)
     await userEvent.click(screen.getByRole('button', { name: /搜索/ }))
-    await userEvent.type(screen.getByRole('textbox'), '唯一标识')
+    // 必须限定在弹出层内：着陆的工具自身也可能带文本框（T7 的 Token 生成器就有「前缀」），
+    // 全局限定的 getByRole('textbox') 会因多个匹配而抛错。
+    await userEvent.type(
+      within(screen.getByRole('dialog', { name: '搜索工具' })).getByRole('textbox'),
+      '唯一标识',
+    )
 
     expect(within(screen.getByRole('dialog', { name: '搜索工具' })).getByText('UUID 生成器')).toBeDefined()
   })

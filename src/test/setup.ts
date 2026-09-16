@@ -1,3 +1,4 @@
+import { webcrypto } from 'node:crypto'
 import { cleanup } from '@testing-library/react'
 import { afterEach, vi } from 'vitest'
 
@@ -26,4 +27,11 @@ if (typeof window !== 'undefined' && !window.matchMedia) {
     removeListener: vi.fn(),
     dispatchEvent: vi.fn(),
   })) as unknown as typeof window.matchMedia
+}
+
+// jsdom 30.0.1 不实现 SubtleCrypto（crypto.subtle 为 undefined），而 HMAC 与 RSA
+// 工具依赖真实 WebCrypto。Node 的 webcrypto 与浏览器实现同源，直接接管整个 crypto
+// （连同 getRandomValues 一起换掉，避免两套 crypto 混用）。
+if (typeof window !== 'undefined' && !window.crypto.subtle) {
+  Object.defineProperty(window, 'crypto', { value: webcrypto, configurable: true })
 }

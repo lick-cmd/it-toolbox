@@ -110,6 +110,34 @@ export function Checkbox({
   )
 }
 
+export function TextInput({
+  label,
+  value,
+  placeholder,
+  onChange,
+  className,
+}: {
+  label?: string
+  value: string
+  placeholder?: string
+  onChange: (value: string) => void
+  className?: string
+}) {
+  return (
+    <input
+      aria-label={label}
+      type="text"
+      className={`${CONTROL} ${className ?? ''}`}
+      value={value}
+      placeholder={placeholder}
+      spellCheck={false}
+      autoCapitalize="off"
+      autoCorrect="off"
+      onChange={(event) => onChange(event.target.value)}
+    />
+  )
+}
+
 export function SegmentedControl<T extends string>({
   label,
   options,
