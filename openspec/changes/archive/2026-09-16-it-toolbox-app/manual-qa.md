@@ -7,6 +7,8 @@
 >
 > **2026-09-16 归档后补充**：`9.4` 的 **macOS 两架构**已在 arm64 本机上真跑完（构建 → 解包 → 启动，含 WebView 与 socket 证据），见文末「执行记录 A」；`9.3` 补上了**运行期**零出网旁证，见「执行记录 B」——**但这不等于 9.3 完成**，它的主体是 17 个工具的逐个操作，未做。
 > `9.6`、`9.10` 以及 `9.4` 的 **Windows 两架构仍未执行**，必须有 Windows / 真机环境。另外本次执行顺带查出一个签名层面的实质问题（见「执行记录 A」的偏差栏）：**x64 产物完全未签名**，`spctl` 评估为 `rejected`。
+>
+> **同日续**：该签名问题已查清根因并做了 quarantine 专项（见「执行记录 C」，含三类产物的判定对照）；此后代码有实质改动（JSON 折叠，提交 `b64c5bf`），产物与代码不再对齐，故**重新打包并复测**，见「执行记录 D」。
 
 ## 0. 共同前置与已有证据
 
@@ -163,3 +165,25 @@
 - **仍缺的最后一步（一次双击）**：上表第三列的「弹框类别」是**推断**（由 `codesign` / `spctl` 的判定文本推出，非人眼所见）。要落成结论，需有人双击 `/tmp/it-toolbox-manual/arm64-adhoc`，确认出现的是「未验证的开发者 ＋ 仍要打开」而非「已损坏」。样本在 `/tmp`，重启即失效。
 - **已实测可用的兜底**：`xattr -dr com.apple.quarantine "<app 路径>"` 之后启动正常（本轮两架构的启动冒烟（执行记录 A）正是以此为前提做的）。
 - 复现本次调查的命令要点：C 源码双架构编译 → `codesign -dv` / `--verify` 对比；`xattr -w com.apple.quarantine "<flags>;<hex 时间戳>;Safari;<uuid>"` 构造 quarantine；`lsappinfo list` 观察 `pre-translocationBundlePath` / `parentASN` 来判断「谁启动的、有没有被转译」。
+
+### 执行记录 D —— 第二版产物复测（含 JSON 折叠功能，2026-09-16）
+
+- **背景**：「执行记录 A」验的是 14:42 / 14:46 那版产物。此后代码有实质改动（JSON 折叠，提交 `b64c5bf`），产物与代码不再对齐，故重新打包复测。**构建时工作区干净、HEAD = `b64c5bf`**；`beforeBuildCommand = npm run build`（含 `tsc --noEmit` + `vite build` + 外发扫描），日志留在 `/tmp/build-both.log`。
+- **产物与复测结果**：
+
+  | 架构 | 产物 | 大小 | 主可执行文件架构 | `codesign --verify` | 真启动 | 运行期 socket |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | arm64 | `src-tauri/target/release/bundle/dmg/IT Toolbox_0.1.0_aarch64.dmg` | 2.3M（解开 4.0M） | `arm64` | 1 | 存活 8s | **0** |
+  | x64 | `src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/IT Toolbox_0.1.0_x64.dmg` | 2.4M（解开 4.4M） | `x86_64` | 1 | 存活 8s | **0** |
+
+  - 运行期 stdout/stderr 均为空；本机解包后的副本**无 quarantine**（未经过下载）。
+  - `codesign -dv` 与「执行记录 A」**完全一致**：arm64 `flags=0x20002(adhoc,linker-signed)`、`Identifier=it_toolbox-8e0a1fed3f352069`、`TeamIdentifier=not set`；x64 输出为空（`not signed at all`）。**W10 尚未处置，本轮未改签名配置**。
+
+- **「本次改动确实在包里」的取证链**（第一条找法失败，记下原因以免后人重踩）：
+  1. ❌ 「在 .app 里 grep 中文字符串」**对 Tauri 产物无效**：`Contents/Resources/` 里只有 `icon.icns`，前端资源被**内嵌进二进制**且被压缩 —— 实测两架构都 grep 不到 `json-code-fold-bar` / `全部折叠`，**这不代表功能没进去**。
+  2. ✅ 对账法：`dist/assets/JsonCode-*.js` 含新增代码（`json-code-fold-bar`、明文「全部折叠」，`shasum` = `8ff929feaa2bb2ae…`）；`dist/assets/index-*.css` 含 `json-fold-toggle`（`c7c42244affdc5b0…`）。
+  3. ✅ `hdiutil attach` 解包后，**dmg 内二进制与构建产物 hash 完全一致**：arm64 `d3bbf46816d84c7b…`、x64 `360371b91ad5a1ea…`（两组各自相等）。
+  4. ✅ 打包日志开头可见 `Running beforeBuildCommand npm run build` 与外发扫描输出 → 前端是在构建时从 `b64c5bf` 重建的（dist 在 15:02 门禁、arm64 构建、x64 构建各重建一次，三次同源）。
+
+- **仍未验证**：① UI 层的折叠交互（点开关、全部折叠/展开的观感）—— 逻辑与 DOM 有单测覆盖，但**没有人眼看过**；② `9.4` 的 Windows 两架构；③ W10 的「右键打开」分叉（同上节）。
+- 清理：`/tmp/qa-v2-arm64`、`/tmp/qa-v2-x64`、挂载点 `/tmp/mnt-*` 与测试进程均已清理（残留自查：无进程、无挂载卷）。
