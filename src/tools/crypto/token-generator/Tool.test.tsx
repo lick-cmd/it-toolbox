@@ -28,6 +28,8 @@ describe('Token 生成器', () => {
     const lines = outputLines()
     expect(lines).toHaveLength(1)
     expect(lines[0]).toHaveLength(32)
+    // 默认字符集也要钉住：只断言长度的话，默认值被改成别的字符集也发现不了
+    expect(lines[0]).toMatch(/^[a-zA-Z0-9]{32}$/)
   })
 
   it('长度改为 64、字符集改为十六进制后输出 64 位十六进制', async () => {
@@ -65,7 +67,7 @@ describe('Token 生成器', () => {
     expect(new Set(lines).size).toBe(5)
   })
 
-  it('前缀 sk_ 会出现在每一行开头', async () => {
+  it('前缀 sk_ 会出现在每一行开头，且计入总数上限', async () => {
     const user = userEvent.setup()
     render(<TokenGeneratorTool />)
 
@@ -76,11 +78,26 @@ describe('Token 生成器', () => {
     const lines = outputLines()
     expect(lines).toHaveLength(3)
     for (const line of lines) expect(line.startsWith('sk_')).toBe(true)
+
+    // 前缀必须参与总数核算：4000 × 25 = 100000「不含前缀刚好不超、含前缀就超」。
+    // 界面若按不含前缀的公式校验，就会放行到 core，而 core 抛出的错曾被静默吞掉。
+    await user.clear(screen.getByLabelText('长度'))
+    await user.type(screen.getByLabelText('长度'), '4000')
+    await user.clear(screen.getByLabelText('数量'))
+    await user.type(screen.getByLabelText('数量'), '25')
+
+    expect(screen.getByRole('alert').textContent).toContain('单次生成的字符总数不得超过 100000')
+    expect(screen.queryAllByRole('listitem')).toHaveLength(0)
   })
 
   it('长度超出上限时提示范围且不输出结果', async () => {
     const user = userEvent.setup()
     render(<TokenGeneratorTool />)
+
+    // 先钉住「上限本身可用」：否则把守卫写成 `>=` 时，下面只测 4097 的断言仍会通过
+    await user.clear(screen.getByLabelText('长度'))
+    await user.type(screen.getByLabelText('长度'), '4096')
+    expect(outputLines()[0]).toHaveLength(4096)
 
     await user.clear(screen.getByLabelText('长度'))
     await user.type(screen.getByLabelText('长度'), '4097')
@@ -95,10 +112,19 @@ describe('Token 生成器', () => {
 
     await user.selectOptions(screen.getByLabelText('字符集'), 'hex')
     // 写入去抖 200ms：轮询到真的落盘，而不是死等固定时长。
-    // 只断言「确实写入了」，不绑定具体存储键名 —— 键名属 storage.ts 的实现细节。
     await vi.waitFor(() => {
       expect(localStorage.length).toBeGreaterThan(0)
     })
+    // 「按工具 id 持久化」是这条用例的意图之一：同 key 往返在「换成任意常量 id」时也成立。
+    // 注意 storage.ts 的布局是「单一 localStorage 键 + JSON 映射」，工具 id 是**映射里的键**
+    // 而不是 localStorage 键名，故只能在落盘内容里找 id（不绑定 storage.ts 的完整键格式）。
+    // 用「映射里存在该 id 这个键」而不是「内容里含该子串」：子串写法挡不住
+    // `'token-generator-v2'` 这类仍含前缀的改名，等于放过了最常见的写错方式。
+    const payloads = Object.keys(localStorage).map(
+      (key) => JSON.parse(localStorage.getItem(key) ?? '{}') as Record<string, unknown>,
+    )
+    expect(payloads.some((payload) => Object.keys(payload).includes('token-generator'))).toBe(true)
+
     first.unmount()
 
     render(<TokenGeneratorTool />)

@@ -43,9 +43,18 @@ const CHARSET_OPTIONS = [
  *
  * 把 core 的守卫在界面上重述一遍，是为了给出**具体原因**：core 抛出的 RangeError
  * 只有消息没有定位，而这里要区分「长度超限」「数量超限」「总数超限」「字符集为空」。
- * 校验通过后 core 仍可能抛错，故生成时另有一层 try/catch 兜底。
+ * 校验通过后 core 仍可能抛错，故生成时另有一层 try/catch 兜底（且该兜底会显示原因）。
+ *
+ * 总数上限必须与 core 同口径：`generateTokens` 用的是 `(length + prefix.length) * count`，
+ * 这里若漏掉 prefix，就会出现「界面校验通过 → core 抛错 → 输出区静默空态」。
  */
-function validate(length: number, count: number, charset: CharsetId, custom: string): ErrorInfo | null {
+function validate(
+  length: number,
+  count: number,
+  charset: CharsetId,
+  custom: string,
+  prefix: string,
+): ErrorInfo | null {
   if (!Number.isInteger(length) || length < 1 || length > MAX_LENGTH) {
     return { error: `长度必须为 1 到 ${MAX_LENGTH} 之间的整数`, code: 'BAD_LENGTH' }
   }
@@ -62,7 +71,7 @@ function validate(length: number, count: number, charset: CharsetId, custom: str
       }
     }
   }
-  if (length * count > MAX_TOTAL_LENGTH) {
+  if ((length + prefix.length) * count > MAX_TOTAL_LENGTH) {
     return { error: `单次生成的字符总数不得超过 ${MAX_TOTAL_LENGTH}`, code: 'TOO_MANY_CHARS' }
   }
   return null
@@ -72,24 +81,31 @@ export default function TokenGeneratorTool() {
   const { state, updateOptions } = useToolState('token-generator', INITIAL_STATE)
   const { length, count, charset, custom, prefix } = state.options
 
-  const paramError = validate(length, count, charset, custom)
+  const paramError = validate(length, count, charset, custom, prefix)
   // 依赖必须是原始值：paramError 每次渲染都是新对象，直接进 deps 会造成无限渲染循环
   const paramIsValid = paramError === null
 
   const [tokens, setTokens] = useState<string[]>([])
+  const [generateError, setGenerateError] = useState<ErrorInfo | null>(null)
 
   useEffect(() => {
     if (!paramIsValid) {
       setTokens((prev) => (prev.length === 0 ? prev : []))
+      setGenerateError(null)
       return
     }
     try {
       setTokens(generateTokens({ length, count, charset, custom, prefix }))
-    } catch {
+      setGenerateError(null)
+    } catch (error) {
+      // 界面校验与 core 守卫是两处独立实现，可能不一致（TOO_MANY_CHARS 就曾漏算前缀）。
+      // 兜底不能静默：把 core 的原因原样显示，避免「参数看着合法却什么都不输出」。
       setTokens((prev) => (prev.length === 0 ? prev : []))
+      setGenerateError({ error: error instanceof Error ? error.message : '生成失败' })
     }
   }, [length, count, charset, custom, prefix, paramIsValid])
 
+  const blockingError = paramError ?? generateError
   const joined = tokens.join('\n')
 
   return (
@@ -155,8 +171,8 @@ export default function TokenGeneratorTool() {
         </div>
       }
       output={
-        paramError ? (
-          <ErrorNote info={paramError} />
+        blockingError ? (
+          <ErrorNote info={blockingError} />
         ) : tokens.length === 0 ? (
           <EmptyState title="尚未生成" hint="调整上方参数即可生成" />
         ) : (
@@ -170,8 +186,8 @@ export default function TokenGeneratorTool() {
         )
       }
       status={
-        paramError ? (
-          <span className="text-danger">{paramError.error}</span>
+        blockingError ? (
+          <span className="text-danger">{blockingError.error}</span>
         ) : (
           <span>共 {tokens.length} 条</span>
         )

@@ -2184,6 +2184,15 @@ git commit -m "feat(crypto): 实现 RSA 密钥对生成与 PEM 导出（5.5 / 5.
 
 - [ ] **Step 1: 写失败的界面测试**
 
+> **执行期修正（2026-09-16，提交 `c098b5c`）**：用例数仍是 9，但抓到 3 处缺陷，其中 1 处是本计划遗漏的**跨计划冲突**：
+> 1. **jest-dom 匹配器（计划缺陷，且会复发）**：本任务测试用了 3 处 `toHaveTextContent` / `toHaveValue`，而仓库未安装 `@testing-library/jest-dom` ⇒ 实测 4 条用例报 `Invalid Chai property`。仓库在**计划①的 T13 已踩过同一个坑**并留下约定（见 `src/framework/ui/ErrorNote.test.tsx` 顶部注释），故沿用其做法改为 `textContent` + `toContain` 与 `.value` + `toBe`，不新增依赖。**T8 / T9 / T10 是同类 UI 任务，很可能复现，执行时先按此约定改写。**
+> 2. **`src/app/App.test.tsx` 的「注册表首项」写死断言（跨计划冲突，原预检漏检）**：该文件断言主面板标题恒为 `UUID 生成器`，并用全局 `getByRole('textbox')` 取搜索框。本任务注册 `token-generator`（id 排序在 `uuid-generator` 之前）后，实测 `expected 'Token 生成器' to be 'UUID 生成器'`，以及**三处** `Found multiple elements with the role "textbox"`（工具自带的「前缀」输入框与搜索框同时在场）。修法（保持原断言意图的最小修正）：首项由 `listTools()[0]` 推导而不写死；「懒加载真的挂载」的证据改为点击侧栏进入确定性工具后断言其按钮；三处文本框查询一律限定在搜索对话框内。**后续每加一个排序在前的工具都会触发同类断言**，故这条修正必须随本任务落地。
+> 3. **`git add` 清单漏了 `src/test/setup.ts`（计划缺陷）**：Step 3 明确要改该文件（补 `crypto.subtle` 垫片），Step 7 的 `git add` 却未列出 ⇒ 按实际交付补上。
+> 4. **共享文件纪律**：`src/framework/ui/index.ts` 是双工作流共享文件，工作区里含并行工作流**未提交**的 `FileDrop` 两行。暂存时用 `git show HEAD:<file> | sed` 构造「HEAD + 仅本任务那一行」再 `git add`，避免把对方改动卷进本提交；提交后工作区仍原样保留对方两行。
+> 5. **计数口径变更**：并行工作流会增补共享文件（如 `framework/file.test.ts`）并新增自建目录（`src/core/web`、`src/tools/web`），继续用「全量 − 并行」推算会漂移 ⇒ 此后改为**直接运行本计划的测试文件**取证。本任务实况：**34 文件 / 389 用例全绿**（其中本计划新增 9 条）。
+> 6. 计划的事实断言经实测复核无误：jsdom 30.0.1 下 `crypto` 为 object、`subtle` 为 undefined、`getRandomValues` 为 function，垫片按原文落地。
+> 7. **评审反馈（1 Important 成立并闭环 + 3 处漏杀补强）**：`validate` 的总数上限原为 `length * count`，与 `generateTokens` 的 `(length + prefix.length) * count` **口径不同** ⇒ 「界面放行 → core 抛错 → 兜底 catch 静默吞掉 → 输出区只剩「尚未生成」」这条静默路径真实存在（本任务注释里写的「校验通过后 core 仍可能抛错」正是它，却没有把原因显示出来）。已改为同口径，并把兜底 catch 从静默改为显示 core 的原因（`ErrorNote` + 状态栏红字），此后同类不一致不会再退化成静默空态。按评审补强 3 处漏杀：**长度上限 4096 的正例**（否则守卫写成 `>=` 也发现不了）、**前缀计入总数上限的边界**（4000×25 不含前缀刚好不超、含前缀就超）、**落盘内容里含本工具 id**（`'token-generator-v2'` 这类仍含前缀的改名要杀得掉，故断言 JSON 映射里存在该键，而不是内容含该子串）。**新增断言一律并入既有用例，用例数仍为 9** —— 避免下游累计值级联改动。变异检验：`length > → >=`（杀）、工具 id 改名（杀）、**修复前形态**（杀）；「公式退回不含前缀」经实测量为**行为等价变异**（兜底显示原因后，两条路径的用户可见结果相同）。
+
 创建 `src/tools/crypto/token-generator/Tool.test.tsx`（此时 `Tool.tsx` 尚未创建，故必然失败）：
 
 ```tsx
