@@ -1165,6 +1165,14 @@ describe('JsonTree', () => {
     expect(screen.getByText('{}')).toBeTruthy()
   })
 
+  it('重复键如实渲染成两行，不因 path 相同而少画一行', () => {
+    // 树层有意让重复键各自成节点（path 相同），界面必须照画两行：
+    // 少画一行就等于替用户删了一个他源码里写着的数据。
+    render(<JsonTree tree={treeOf('{"a":1,"a":2}')} />)
+    expect(rowTexts()).toHaveLength(3) // $ 、两行 $.a
+    expect(rowTexts().filter((text) => text.includes('a:'))).toHaveLength(2)
+  })
+
   it('大输入默认只展开第一层，并如实提示渲染上限', () => {
     // 2010 个单元素数组：节点数越过自动折叠阈值，默认只展开根这一层
     const big = `[${Array.from({ length: 2010 }, (_, index) => `[${index}]`).join(',')}]`
@@ -1216,6 +1224,10 @@ const BUTTON = 'h-6 rounded-sm border border-border bg-surface-2 px-2 text-[12px
  * 因此文档换了才回到默认折叠态；同一份文档内容变化不该把用户的手动折叠抹掉。
  * 「渲染哪些行」交给 core 的 `visibleRows`，组件只负责画与交互 —— 于是
  * 折叠语义可以在 node 工程里单测，不必依赖 DOM。
+ *
+ * 折叠态按 path 记录，于是源码里有重复键时（`{"a":1,"a":2}`）这两个节点会**一起**
+ * 折叠/展开：它们本就同名，没有更细的粒度可用。这是「优先忠实显示源码」的代价，
+ * 与 `core/json/tree.ts` 里重复键不加后缀是同一条裁定。
  */
 export function JsonTree({ tree, label, maxRows }: JsonTreeProps) {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(
@@ -1265,9 +1277,12 @@ export function JsonTree({ tree, label, maxRows }: JsonTreeProps) {
       )}
 
       <ul className="m-0 list-none p-0 text-[12px]">
-        {rows.map(({ node, expandable, expanded }) => (
+        {/* key 用行序号，**不能**用 node.path：源码里有重复键时树会给出两个 path 相同的
+            节点（见 `core/json/tree.ts`），path 不是唯一键，React 会报重复 key 警告并在
+            更新时错配 DOM。行是纯展示的、没有内部状态，序号键不会引起状态串位。 */}
+        {rows.map(({ node, expandable, expanded }, index) => (
           <li
-            key={node.path}
+            key={index}
             data-testid="json-tree-row"
             className="json-tree-row"
             style={{ paddingLeft: 10 + node.depth * 14 }}
@@ -1299,7 +1314,7 @@ export function JsonTree({ tree, label, maxRows }: JsonTreeProps) {
 - [ ] **Step 4: 跑用例确认通过**
 
 Run: `npx vitest run --project ui src/framework/ui/JsonTree.test.tsx`
-Expected: PASS（6 条）。
+Expected: PASS（7 条）。
 
 - [ ] **Step 5: 提交**
 
