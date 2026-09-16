@@ -696,10 +696,10 @@ describe('collapseAllPaths', () => {
 })
 ```
 
-顶部 import 里补上 `TREE_AUTO_COLLAPSE_NODES`：
+顶部 import 只**补新名字**，不要整块替换 —— `parseJson` / `collectTypeHints` / `jsonChildPath` 已在顶部（Task 1 的用例在用），漏掉它们会让既有用例直接编译不过。改完顶部应是：
 
 ```ts
-import { collectTypeHints } from './type-hints'
+import { describe, expect, it } from 'vitest'
 import {
   TREE_AUTO_COLLAPSE_NODES,
   buildJsonTree,
@@ -709,7 +709,11 @@ import {
   visibleRows,
   type JsonTreeNode,
 } from './tree'
+import { parseJson } from './parse'
+import { collectTypeHints, jsonChildPath } from './type-hints'
 ```
+
+即：`./tree` 那条补 `TREE_AUTO_COLLAPSE_NODES` / `collapseAllPaths` / `visibleRows` 三个名字（大写常量在前、`type` 项在后，与仓库既有风格一致），另两条 import 保持原样。
 
 - [ ] **Step 2: 跑用例确认失败**
 
@@ -770,7 +774,7 @@ export function collapseAllPaths(tree: JsonTreeModel): string[] {
 - [ ] **Step 4: 跑用例确认通过**
 
 Run: `npx vitest run --project core src/core/json/tree.test.ts`
-Expected: PASS（16 条）。
+Expected: PASS（23 条）。
 
 - [ ] **Step 5: 提交**
 
