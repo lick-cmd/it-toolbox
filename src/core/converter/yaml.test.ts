@@ -127,3 +127,26 @@ describe('jsonToYaml', () => {
     if (back.ok) expect(JSON.parse(back.value)).toEqual(JSON.parse(source))
   })
 })
+
+describe('jsonToYaml 的缩进选项', () => {
+  const NESTED = '{"a":{"b":{"c":1}}}'
+
+  it('缺省与 indent: 2 等价', () => {
+    const plain = jsonToYaml(NESTED)
+    const two = jsonToYaml(NESTED, { indent: 2 })
+    expect(plain.ok && two.ok).toBe(true)
+    if (plain.ok && two.ok) expect(two.value).toBe(plain.value)
+  })
+
+  it('indent: 4 时嵌套更深', () => {
+    const result = jsonToYaml(NESTED, { indent: 4 })
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.value).toContain('    b:')
+  })
+
+  it('空输入仍返回空串', () => {
+    const result = jsonToYaml('   ', { indent: 4 })
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.value).toBe('')
+  })
+})

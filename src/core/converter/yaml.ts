@@ -60,8 +60,16 @@ export function yamlToJson(text: string, options: YamlToJsonOptions = {}): Resul
  *
  * `lineWidth: -1` 关闭折行、`noRefs: true` 关闭锚点/别名 —— 两者都是
  * 「YAML 再转回 JSON 必须语义等价」的前提。
+ *
+ * 已知有损点：本函数经 `js-yaml` 重新序列化，会丢大整数精度与重复键。
+ * 调用方应用 `hasUnsafeInteger` 提示用户，而不是假装没事。
  */
-export function jsonToYaml(text: string): Result<string> {
+export interface JsonToYamlOptions {
+  /** 默认 2。YAML 规范禁止用制表符缩进，故这里只有 2 | 4 */
+  indent?: YamlIndent
+}
+
+export function jsonToYaml(text: string, options: JsonToYamlOptions = {}): Result<string> {
   if (text.trim().length === 0) return ok('')
 
   const scanned = scanJson(text)
@@ -78,5 +86,5 @@ export function jsonToYaml(text: string): Result<string> {
 
   // 已由 scanJson 严格校验，故此处的 JSON.parse 不会抛错
   const value: unknown = JSON.parse(text)
-  return ok(dump(value, { indent: 2, lineWidth: -1, noRefs: true }))
+  return ok(dump(value, { indent: options.indent ?? 2, lineWidth: -1, noRefs: true }))
 }
