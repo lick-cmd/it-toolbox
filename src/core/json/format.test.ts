@@ -103,3 +103,64 @@ describe('formatJson — 错误透传', () => {
     }
   })
 })
+
+describe('转义与 Unicode 选项', () => {
+  const SRC = '{"a":"\\/","b":"\\u0041","c":"中","d":"\\u4e2d"}'
+
+  const DEFAULT_OUTPUT = '{\n  "a": "\\/",\n  "b": "\\u0041",\n  "c": "中",\n  "d": "\\u4e2d"\n}'
+  const NORMALIZED = '{\n  "a": "/",\n  "b": "A",\n  "c": "中",\n  "d": "\\u4e2d"\n}'
+  const ESCAPED = '{\n  "a": "\\/",\n  "b": "\\u0041",\n  "c": "\\u4e2d",\n  "d": "\\u4e2d"\n}'
+  const BOTH = '{\n  "a": "/",\n  "b": "A",\n  "c": "\\u4e2d",\n  "d": "\\u4e2d"\n}'
+
+  function outputOf(options: Parameters<typeof formatJson>[1]): string {
+    const result = formatJson(SRC, options)
+    if (!result.ok) throw new Error(`期望成功，实际失败：${result.error}`)
+    return result.value.output
+  }
+
+  it('缺省即保留转义原样（零回归）', () => {
+    expect(outputOf({ indent: 2 })).toBe(DEFAULT_OUTPUT)
+
+    const result = formatJson(SRC, { indent: 2 })
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.value.normalizedEscapes).toBe(false)
+  })
+
+  it('keepEscapes: false 规范化 ASCII 转义，但不碰非 ASCII', () => {
+    expect(outputOf({ indent: 2, keepEscapes: false })).toBe(NORMALIZED)
+  })
+
+  it('unicode: escape 只动非 ASCII', () => {
+    expect(outputOf({ indent: 2, unicode: 'escape' })).toBe(ESCAPED)
+  })
+
+  it('两者同开', () => {
+    expect(outputOf({ indent: 2, keepEscapes: false, unicode: 'escape' })).toBe(BOTH)
+  })
+
+  it('unicode: unescape 还原非 ASCII 转义', () => {
+    const result = formatJson('{"c":"\\u4e2d"}', { indent: 2, unicode: 'unescape' })
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.value.output).toBe('{\n  "c": "中"\n}')
+  })
+
+  it('键排序路径与逐 token 路径在开 unicode 后风格一致', () => {
+    expect(outputOf({ sortKeys: true, unicode: 'escape' })).toBe(BOTH)
+  })
+
+  it('发生转义改写时 normalizedEscapes 为 true', () => {
+    const result = formatJson(SRC, { indent: 2, keepEscapes: false })
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.value.normalizedEscapes).toBe(true)
+  })
+
+  it('输出仍是合法 JSON', () => {
+    const result = formatJson('{"a":"\\/","c":"中"}', {
+      indent: 2,
+      keepEscapes: false,
+      unicode: 'escape',
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(() => JSON.parse(result.value.output)).not.toThrow()
+  })
+})
