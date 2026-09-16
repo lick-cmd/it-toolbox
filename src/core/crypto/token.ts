@@ -3,7 +3,10 @@ import { pickChars } from '../random'
 export type CharsetId = 'alphanumeric' | 'hex' | 'base64' | 'base64url' | 'custom'
 
 export interface TokenOptions {
-  /** 随机段长度（不含前缀） */
+  /**
+   * 随机段长度（不含前缀）。按**码点**计数：自定义字符集里含代理对字符（如 emoji）时，
+   * 返回值的 UTF-16 `length` 会大于该值。
+   */
   length: number
   count: number
   charset: CharsetId
@@ -40,7 +43,14 @@ const BUILTIN_CHARSETS: Record<Exclude<CharsetId, 'custom'>, string> = {
  * 不能留给调用方。
  */
 export function resolveCharset(charset: CharsetId, custom = ''): string {
-  if (charset !== 'custom') return BUILTIN_CHARSETS[charset]
+  if (charset !== 'custom') {
+    const builtin: string | undefined = BUILTIN_CHARSETS[charset]
+    // 运行期兜底：类型之外传进来的非法值，不应该以 TypeError 的形式炸在 random.ts 里
+    if (builtin === undefined) {
+      throw new RangeError(`未知的字符集：${String(charset)}`)
+    }
+    return builtin
+  }
 
   if (custom.trim().length === 0) {
     throw new RangeError('自定义字符集不可为空')
@@ -62,7 +72,8 @@ export function generateTokens(options: TokenOptions): string[] {
   if (!Number.isInteger(count) || count < 0 || count > MAX_COUNT) {
     throw new RangeError(`数量必须为 0 到 ${MAX_COUNT} 之间的整数`)
   }
-  if (length * count > MAX_TOTAL_LENGTH) {
+  // 前缀是自由文本，同样占用界面渲染与复制的时间，必须计入总量
+  if ((length + prefix.length) * count > MAX_TOTAL_LENGTH) {
     throw new RangeError(`单次生成的字符总数不得超过 ${MAX_TOTAL_LENGTH}`)
   }
 
