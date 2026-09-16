@@ -313,14 +313,25 @@ describe('generateRsaKeyPair', () => {
   })
 
   it('支持 1024 / 2048 / 3072 / 4096，非法长度抛 RangeError', async () => {
-    const short = await generateRsaKeyPair({
-      keySize: 1024,
-      privateKeyFormat: 'pkcs1',
-      publicKeyFormat: 'spki',
-    })
-    expect(short.keySize).toBe(1024)
+    // 上端两个长度必须真的生成得出来：只测 1024 的话，把 3072 / 4096 从 KEY_SIZES
+    // 里删掉也不会被发现（1024 由上面的用例、2048 由 openssl 用例覆盖）
+    for (const keySize of [3072, 4096] as const) {
+      const pair = await generateRsaKeyPair({
+        keySize,
+        privateKeyFormat: 'pkcs1',
+        publicKeyFormat: 'spki',
+      })
+      expect(pair.keySize).toBe(keySize)
 
-    // 运行期守卫：512 只能靠断言传进来，正是要证明「非法长度不会生成密钥」
+      // 模数位数必须等于请求长度，才算「真的生成了该长度」（只回填字段骗不过这里）
+      const modulus = readSequenceChildren(pemToDer(pair.privateKey))[1]
+      if (!modulus) throw new Error('PKCS#1 私钥缺少模数字段')
+      expect(toBigInt(modulus.value).toString(2)).toHaveLength(keySize)
+    }
+
+    // 运行期守卫：512 只能靠断言传进来，正是要证明「非法长度不会生成密钥」。
+    // 断言错误**文案**而不只是错误类：守卫被删掉时 WebCrypto 自己抛的也是
+    // RangeError，只判类型会漏杀。
     const invalidSize = 512 as RsaKeySize
     await expect(
       generateRsaKeyPair({
@@ -328,6 +339,6 @@ describe('generateRsaKeyPair', () => {
         privateKeyFormat: 'pkcs1',
         publicKeyFormat: 'spki',
       }),
-    ).rejects.toThrow(RangeError)
-  }, 30_000)
+    ).rejects.toThrow(/密钥长度仅支持/)
+  }, 60_000)
 })

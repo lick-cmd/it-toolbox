@@ -1690,6 +1690,19 @@ Expected: `tc=0 lint=0`（此时只有配置变更，尚无新代码）
 
 - [ ] **Step 2: 写失败测试**
 
+> **执行期修正（2026-09-16，提交 `51ad833` + 评审补齐）**：本任务抓到本计划**最多的测试用法缺陷**，全部以实测证据定案（用例数仍是 9，未影响下游累计值）：
+> 1. **`readChildren(pemToDer(...))` 吃整段 DER**：只得到 1 个子元素。实测失败 `expected [ { tag: 48, …(2) } ] to have a length of 9 but got 1`（48 = 0x30 = 外层 SEQUENCE）⇒ 新增 `readSequenceChildren(der)`：先 `readTlv` 取 `.value`，并断言 `tag === 0x30` 与 `outer.next === der.length`。
+> 2. **SPKI 的 BIT STRING 内容里还套一层 `RSAPublicKey SEQUENCE`**（RFC 5280 + RFC 8017 A.1.1），计划把它当成直接的 INTEGER 流。openssl 取证：`openssl asn1parse -in pub.pem -strparse 22` 输出 `SEQUENCE { INTEGER n, INTEGER e }` ⇒ 该处同样改用 `readSequenceChildren`。
+> 3. **SSH blob 是 `uint32 长度前缀`，不是 DER 的 TLV**，计划复用了 `readTlv`。实测失败 `expected '' to be 'ssh-rsa'`（首字节 0x00 被当标签、长度读成 0）⇒ 新增 `readSshField`（uint32 大端；高位字节用乘法而不是 `<< 24`，避开 `<<` 的有符号语义）。
+>
+> 三条都出现在 `openssl rsa -check` 与「签名 / 验签往返」**已经通过**的前提下 ⇒ 是测试写法错，不是实现错。
+>
+> 4. **类型层面**：`pemToDer` 的返回类型必须写成 `Uint8Array<ArrayBuffer>`（默认的 `ArrayBufferLike` 与 `BufferSource` 不兼容，TS2345）。这里改类型而不是再复制一份：它返回的本来就是新建的 ArrayBuffer 支撑数组。
+> 5. **配置硬化（评审 C-1，本轮最有价值的一条）**：`types: ["node"]` 会注入 `process` / `Buffer` / `setImmediate` / `clearImmediate` / `global` 这些**全局标识符**，而 `no-restricted-imports` 只管 import ⇒ core 生产代码里写 `Buffer.from(...)` 能同时通过 tsc 与 lint，却在 WebView 崩溃 —— 恰是本任务想避免的「类型过、运行崩」静默缺陷。已在同一配置块补 `no-restricted-globals`（因后匹配块会整体覆盖同名规则，DOM 那四个全局必须一并重列），并把**裸模块名**（`import 'fs'`）补进黑名单 —— 实测两者此前都是漏网的口子。
+> 6. **守卫用例加严（评审 I-1 / I-2）**：① 只断言 `RangeError` 不够 —— 守卫被删时 WebCrypto 自己抛的也是 `RangeError` ⇒ 改断言文案 `/密钥长度仅支持/`；② 只生成 1024 时 `KEY_SIZES` 删掉 3072 / 4096 也不会被发现 ⇒ 真实生成 3072 / 4096 并断言**模数位数 = 请求长度**。变异「`KEY_SIZES = [1024, 2048]`」实测被该用例**恰好杀死**。
+> 7. **手动外部复核结果**（Step 6 的「手动复核 openssl」做实）：`openssl rsa -check` → `RSA key ok`；`openssl pkey -check`（PKCS#8）→ `Key is valid`；同密钥对内私钥模数 ≡ PKCS#1 公钥模数；`ssh-keygen -l` 能解析我们导出的 openssh 行；**`ssh-keygen -y` 从我们的 PKCS#1 私钥派生的公钥行与我们导出的 openssh 行逐字节一致**。
+> 8. **门禁口径**：本 worktree 另有并行工作流（`src/core/converter/`、`src/tools/converter/`、`src/framework/ui/FileDrop.*`），会同时改动全仓 lint/typecheck/测试计数。此后 `npm test` 的全量数字 = 本计划范围 + 并行工作流；本任务的「我的范围」为 **370 用例 / 31 文件**（全量 463 / 41 − 并行 93 / 10）。提交时只 `git add` 本任务的文件。
+
 创建 `src/core/crypto/rsa.test.ts`：
 
 ```ts

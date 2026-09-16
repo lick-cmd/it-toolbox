@@ -107,7 +107,76 @@ export default tseslint.config(
     rules: {
       'no-restricted-imports': [
         'error',
-        { patterns: [{ group: ['node:*'], message: 'core 生产代码不得依赖 Node 内置模块' }] },
+        {
+          patterns: [
+            { group: ['node:*'], message: 'core 生产代码不得依赖 Node 内置模块' },
+            // `node:` 前缀不是唯一写法：裸模块名（'fs'）同样会在 WebView 里崩，而
+            // @types/node 对两者都声明，只挡前缀会留下一整片静默漏洞。
+            {
+              group: [
+                'fs',
+                'fs/*',
+                'path',
+                'path/*',
+                'os',
+                'os/*',
+                'child_process',
+                'crypto',
+                'stream',
+                'stream/*',
+                'util',
+                'util/*',
+                'buffer',
+                'events',
+                'url',
+                'url/*',
+                'assert',
+                'assert/*',
+                'zlib',
+                'net',
+                'http',
+                'https',
+                'http2',
+                'tls',
+                'dgram',
+                'cluster',
+                'vm',
+                'v8',
+                'timers',
+                'timers/*',
+                'readline',
+                'readline/*',
+                'dns',
+                'dns/*',
+                'tty',
+                'perf_hooks',
+                'string_decoder',
+                'querystring',
+                'worker_threads',
+              ],
+              message: 'core 生产代码不得依赖 Node 内置模块（含裸模块名写法）',
+            },
+          ],
+        },
+      ],
+      // 只堵 import 是不够的：types 打开 "node" 后，process / Buffer / setImmediate 这些
+      // **全局标识符**会被注入，`Buffer.from(...)` 能同时通过 tsc 与 lint，却在 WebView 里崩。
+      // 本块 ignore 了测试（core 测试里确实在用 Buffer），故这里补上全局限制；
+      // 又因后匹配的配置块会整体覆盖同名规则，DOM 那四个全局必须在这里重列一遍。
+      'no-restricted-globals': [
+        'error',
+        { name: 'document', message: 'core 层不得接触 DOM' },
+        { name: 'window', message: 'core 层不得接触 DOM' },
+        { name: 'localStorage', message: 'core 层不得接触存储' },
+        { name: 'alert', message: 'core 层不得接触 UI' },
+        { name: 'process', message: 'core 生产代码不得依赖 Node 全局（WebView 中不存在）' },
+        { name: 'Buffer', message: 'core 生产代码不得依赖 Node 全局（WebView 中不存在）' },
+        { name: 'setImmediate', message: 'core 生产代码不得依赖 Node 全局（WebView 中不存在）' },
+        {
+          name: 'clearImmediate',
+          message: 'core 生产代码不得依赖 Node 全局（WebView 中不存在）',
+        },
+        { name: 'global', message: 'core 生产代码不得依赖 Node 全局（WebView 中不存在）' },
       ],
     },
   },
