@@ -99,6 +99,19 @@ export default tseslint.config(
     },
   },
   {
+    // core 的生产代码要在 WebView 中运行，Node 内置模块只在测试里可用。
+    // 这条口子是 T6 为 openssl 交叉验证打开 types: ["node"] 时新开的，
+    // 不堵住就会出现「类型通过、WebView 崩溃」的静默缺陷。
+    files: ['src/core/**/*.ts'],
+    ignores: ['src/core/**/*.test.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { patterns: [{ group: ['node:*'], message: 'core 生产代码不得依赖 Node 内置模块' }] },
+      ],
+    },
+  },
+  {
     // framework 层：不知道具体工具的实现
     files: ['src/framework/**/*.{ts,tsx}'],
     rules: {
