@@ -8,32 +8,31 @@ import { App } from './App'
 
 /**
  * tasks.md 9.1「核对 17 个工具在侧栏与搜索中均可发现，且分类归属正确」的验收用例。
- * （当前分支为 18 个：新增 json-converter，json-to-yaml 待 Task 13 下线后回到 17）
  *
  * 为什么需要本文件：既有用例证明的是别的东西 —— `registry.test.ts` 只校验注册表一致性
  * （配对 / id / 类别合法 / keywords 非空），`App.test.tsx` 与 `CommandPalette.test.tsx`
  * 写于「仓库只有 1 个工具」时期，前者只断言 `listTools()[0]` 是 UUID 生成器、后者的候选项
- * 来自 3 条合成样本。**没有任何用例断言「全部 18 个工具都能被渲染、都能被搜到」**。
+ * 来自 3 条合成样本。**没有任何用例断言「全部 17 个工具都能被渲染、都能被搜到」**。
  *
  * 这份基线故意写死：新增或删除工具时它必须失败，由作者显式更新 —— 否则「17 个」这个
  * spec 数字会随注册表悄悄漂移。
  */
 const BASELINE: ReadonlyArray<readonly [ToolCategory, readonly string[]]> = [
   ['crypto', ['token-generator', 'ulid-generator', 'hmac-generator', 'rsa-key-generator', 'uuid-generator']],
-  ['converter', ['date-converter', 'base64', 'yaml-to-json', 'json-to-yaml', 'json-converter', 'markdown-to-html']],
+  ['converter', ['date-converter', 'base64', 'yaml-to-json', 'json-converter', 'markdown-to-html']],
   ['web', ['url-codec', 'json-diff', 'jwt-parser', 'url-analyzer']],
   ['image', ['qrcode-generator']],
   ['dev', ['json-minify', 'json-format']],
 ]
 
 describe('9.1 工具可发现性（真实注册表）', () => {
-  it('注册表恰好 18 个工具，且每个类别的 id 集合与基线一致', () => {
-    // 注册表本身无任何配对/命名/类别问题 —— 后续断言建立在「18 条都是有效条目」之上
+  it('注册表恰好 17 个工具，且每个类别的 id 集合与基线一致', () => {
+    // 注册表本身无任何配对/命名/类别问题 —— 后续断言建立在「17 条都是有效条目」之上
     expect(getRegistryIssues()).toEqual([])
 
     const entries = listTools()
-    expect(entries).toHaveLength(18)
-    expect(new Set(entries.map((entry) => entry.meta.id)).size).toBe(18)
+    expect(entries).toHaveLength(17)
+    expect(new Set(entries.map((entry) => entry.meta.id)).size).toBe(17)
 
     for (const [category, ids] of BASELINE) {
       const actual = listByCategory(category)
@@ -48,7 +47,7 @@ describe('9.1 工具可发现性（真实注册表）', () => {
     )
   })
 
-  it('侧栏渲染全部 18 个工具，顺序与注册表一致，并列出每个类别名', () => {
+  it('侧栏渲染全部 17 个工具，顺序与注册表一致，并列出每个类别名', () => {
     render(<App />)
     const nav = screen.getByRole('navigation', { name: '工具导航' })
 

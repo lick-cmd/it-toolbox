@@ -3,7 +3,7 @@
 离线可用的 IT 工具集合。运行期零网络请求。
 
 > **当前进度**：**17 个工具全部交付**（加密 5：UUID / Token / ULID / HMAC / RSA 密钥对；
-> 转换器 5：日期 / Base64 / YAML↔JSON / Markdown；Web 4：URL 编码 / JSON 差异 / JWT / URL 分析；
+> 转换器 5：日期 / Base64 / **JSON 转换** / YAML→JSON / Markdown；Web 4：URL 编码 / JSON 差异 / JWT / URL 分析；
 > 图片 1：二维码；开发 2：JSON 压缩 / JSON 美化），框架层完整
 > （工具注册表、搜索、命令面板、主题、持久化、剪贴板/文件、错误定位、离线四层）。
 > 安装产物已实测 **macOS Apple Silicon 与 Intel**（`.dmg` 2.3M / 2.4M，含全部 17 个工具，远低于 15MB 上限）；
@@ -63,6 +63,11 @@ npm run tauri:build   # 打包桌面安装产物
 
 单测分三个 project：`core`（Node 环境，纯算法，零 React / 零 Tauri / 零 DOM）、
 `ui`（jsdom，框架层、工具组件与应用外壳）与 `scripts`（Node 环境，构建期脚本，如产物外发扫描）。
+
+## CSV 导出的 BOM
+
+JSON 转换器导出 CSV 时：**复制**给的是纯净文本（不带 BOM），**下载**会在开头加 UTF-8 BOM，
+否则 Excel 打开含中文的 CSV 会乱码。这是刻意的轻微不一致，不是缺陷。
 
 ## 离线约束
 
