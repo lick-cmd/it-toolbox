@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getTool, listTools, type ToolEntry } from '@/framework/registry'
 import { applyTheme, resolveTheme, systemPrefersDark } from '@/framework/theme'
+import type { ToolHandoff } from '@/framework/types'
 import { pushRecent, usePrefs, type RecentEntry } from '@/framework/usePrefs'
 import { ToolHost } from '@/framework/ToolHost'
 import { Icon } from '@/framework/ui/Icon'
@@ -25,6 +26,20 @@ export function resolveLandingToolId(
   const candidate = activeId ?? recents[0]?.id ?? fallback
   if (candidate === null) return null
   return entries.some((entry) => entry.meta.id === candidate) ? candidate : fallback
+}
+
+/**
+ * 取出应该下发给 `entryId` 的交接载荷。
+ *
+ * 必须校验 targetId：`resolveLandingToolId` 在 id 失效时会回退到注册表首项，
+ * 不校验就可能把载荷种给错误的工具。
+ */
+export function handoffFor(
+  handoff: { targetId: string; payload: ToolHandoff } | null,
+  entryId: string | undefined,
+): ToolHandoff | undefined {
+  if (handoff === null || entryId === undefined) return undefined
+  return handoff.targetId === entryId ? handoff.payload : undefined
 }
 
 export function App() {
@@ -75,7 +90,11 @@ export function App() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  const openTool = useCallback((id: string) => {
+  const [handoff, setHandoff] = useState<{ targetId: string; payload: ToolHandoff } | null>(null)
+
+  const openTool = useCallback((id: string, payload?: ToolHandoff) => {
+    // 每次导航都重置：不带载荷就清空，天然一次性，不会残留给下一个工具
+    setHandoff(payload ? { targetId: id, payload } : null)
     setActiveId(id)
     pushRecent(id)
     setDrawerOpen(false)
@@ -139,7 +158,15 @@ export function App() {
         </header>
 
         <main className="min-h-0 flex-1">
-          {resolvedEntry ? <ToolHost entry={resolvedEntry} /> : <p className="p-4 text-muted">尚无可用工具</p>}
+          {resolvedEntry ? (
+            <ToolHost
+              entry={resolvedEntry}
+              handoff={handoffFor(handoff, resolvedEntry.meta.id)}
+              onNavigate={openTool}
+            />
+          ) : (
+            <p className="p-4 text-muted">尚无可用工具</p>
+          )}
         </main>
       </div>
 

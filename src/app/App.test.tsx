@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { listTools, type ToolEntry } from '@/framework/registry'
 import { __resetPrefsForTests, type RecentEntry } from '@/framework/usePrefs'
-import { App, resolveLandingToolId } from './App'
+import { App, handoffFor, resolveLandingToolId } from './App'
 
 function entry(id: string, name: string): ToolEntry {
   return {
@@ -227,5 +227,55 @@ describe('App', () => {
     )
 
     expect(within(screen.getByRole('dialog', { name: '搜索工具' })).getByText('UUID 生成器')).toBeDefined()
+  })
+
+  it('从 JSON 美化带同一份 JSON 跳到 JSON 转换器', async () => {
+    render(<App />)
+    await userEvent.click(screen.getByRole('button', { name: 'JSON 美化' }))
+
+    const source = (await screen.findByRole('textbox', { name: 'JSON 源码' })) as HTMLTextAreaElement
+    fireEvent.change(source, { target: { value: '{"a":1}' } })
+    expect(source.value).toBe('{"a":1}')
+
+    await userEvent.click(screen.getByRole('button', { name: '转换' }))
+
+    // 转换器默认输出 JS；出现 `const data = {` 就说明这份 JSON 真的被带过来了
+    await waitFor(() => {
+      const items = screen.getAllByRole('listitem').map((item) => item.lastElementChild?.textContent ?? '')
+      expect(items.join('\n')).toContain('const data = {')
+    })
+  })
+
+  it('从 JSON 转换器「去美化」回到美化页，输入仍是同一份', async () => {
+    render(<App />)
+    await userEvent.click(screen.getByRole('button', { name: 'JSON 转换器' }))
+
+    const source = (await screen.findByRole('textbox', { name: 'JSON 源码' })) as HTMLTextAreaElement
+    fireEvent.change(source, { target: { value: '{"b":2}' } })
+
+    await userEvent.click(screen.getByRole('button', { name: '去美化' }))
+
+    await waitFor(() => {
+      const back = screen.getByRole('textbox', { name: 'JSON 源码' }) as HTMLTextAreaElement
+      expect(back.value).toBe('{"b":2}')
+    })
+  })
+
+  // 「不带载荷的导航不会把载荷留给下一个工具」不写成端到端用例：那样要依赖
+  // useToolState 200ms 去抖写入 localStorage 的时序，会变成不稳定测试。
+  // 改为直接单测守卫函数（与本文件单测 resolveLandingToolId 的做法一致）。
+  it('handoffFor 只把载荷交给目标工具', () => {
+    const payload = { input: '{"a":1}' }
+    expect(handoffFor({ targetId: 'json-converter', payload }, 'json-converter')).toEqual(payload)
+  })
+
+  it('handoffFor 在 id 不匹配时不给载荷（注册表回退时不会种错工具）', () => {
+    const payload = { input: '{"a":1}' }
+    expect(handoffFor({ targetId: 'json-converter', payload }, 'json-format')).toBeUndefined()
+  })
+
+  it('handoffFor 对空载荷与无效 id 都返回 undefined', () => {
+    expect(handoffFor(null, 'json-format')).toBeUndefined()
+    expect(handoffFor({ targetId: 'x', payload: { input: '' } }, undefined)).toBeUndefined()
   })
 })
