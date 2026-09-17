@@ -11,11 +11,12 @@ import { CopyButton } from '@/framework/ui/CopyButton'
 import { DownloadButton } from '@/framework/ui/DownloadButton'
 import { EmptyState } from '@/framework/ui/EmptyState'
 import { ErrorNote } from '@/framework/ui/ErrorNote'
-import { Checkbox, SegmentedControl } from '@/framework/ui/Inputs'
+import { Checkbox, SegmentedControl, ToolbarRow } from '@/framework/ui/Inputs'
 import { JsonCode } from '@/framework/ui/JsonCode'
 import { JsonTree } from '@/framework/ui/JsonTree'
 import { Spinner } from '@/framework/ui/Spinner'
 import type { SelectOption } from '@/framework/ui'
+import type { ToolProps } from '@/framework/types'
 
 /** UI 里的选项只能是字符串，故用 '2' | '4' | 'tab'，落到 Core 时再换算 */
 type IndentChoice = '2' | '4' | 'tab'
@@ -39,6 +40,20 @@ const INDENT_LABEL: Record<IndentChoice, string> = {
   tab: '制表符',
 }
 
+type UnicodeChoice = 'keep' | 'escape' | 'unescape'
+
+const UNICODE_OPTIONS: readonly SelectOption<UnicodeChoice>[] = [
+  { value: 'keep', label: '原样' },
+  { value: 'escape', label: '转义' },
+  { value: 'unescape', label: '反转义' },
+]
+
+const UNICODE_LABEL: Record<UnicodeChoice, string> = {
+  keep: '原样',
+  escape: '转义',
+  unescape: '反转义',
+}
+
 function toJsonIndent(choice: IndentChoice): JsonIndent {
   if (choice === 'tab') return 'tab'
   return choice === '2' ? 2 : 4
@@ -50,6 +65,8 @@ const INITIAL_STATE = {
     indent: '2' as IndentChoice,
     sortKeys: false,
     view: 'json' as ViewChoice,
+    keepEscapes: true,
+    unicode: 'keep' as UnicodeChoice,
   },
 }
 
@@ -68,10 +85,10 @@ const MAX_PREVIEW_ROWS = 2000
 
 const BUTTON = 'h-6 rounded-sm border border-border bg-surface-2 px-2 text-[12px] hover:border-accent'
 
-export default function JsonFormatTool() {
-  const { state, update, updateOptions } = useToolState('json-format', INITIAL_STATE)
+export default function JsonFormatTool({ handoff, onNavigate }: ToolProps) {
+  const { state, update, updateOptions } = useToolState('json-format', INITIAL_STATE, handoff)
   const { input } = state
-  const { indent, sortKeys, view } = state.options
+  const { indent, sortKeys, view, keepEscapes, unicode } = state.options
 
   // 哪份文本已经算完了。小输入首帧就同步跟上（不会为每次按键闪一帧「处理中」），
   // 大输入让出一帧再算 —— 界面因此不出现无响应。
@@ -92,8 +109,16 @@ export default function JsonFormatTool() {
 
   // 依赖全部是原始值（计划① R16：对象依赖会造成无限渲染循环）
   const result = useMemo(
-    () => (computing || isEmpty ? null : formatJson(input, { indent: toJsonIndent(indent), sortKeys })),
-    [computing, isEmpty, input, indent, sortKeys],
+    () =>
+      computing || isEmpty
+        ? null
+        : formatJson(input, {
+            indent: toJsonIndent(indent),
+            sortKeys,
+            keepEscapes,
+            unicode,
+          }),
+    [computing, isEmpty, input, indent, sortKeys, keepEscapes, unicode],
   )
 
   const output = result !== null && result.ok ? result.value.output : null
@@ -125,29 +150,44 @@ export default function JsonFormatTool() {
     <ToolLayout
       options={
         <>
-          <SegmentedControl
-            label="缩进"
-            options={INDENT_OPTIONS}
-            value={indent}
-            onChange={(next) => updateOptions({ indent: next })}
-          />
-          <SegmentedControl
-            label="视图"
-            options={VIEW_OPTIONS}
-            value={view}
-            onChange={(next) => updateOptions({ view: next })}
-          />
-          <Checkbox
-            label="键排序"
-            checked={sortKeys}
-            onChange={(checked) => updateOptions({ sortKeys: checked })}
-          />
-          <button type="button" className={BUTTON} onClick={() => update({ input: SAMPLE })}>
-            填入示例
-          </button>
-          <button type="button" className={BUTTON} onClick={() => update({ input: '' })}>
-            清空
-          </button>
+          <ToolbarRow>
+            <SegmentedControl
+              label="缩进"
+              options={INDENT_OPTIONS}
+              value={indent}
+              onChange={(next) => updateOptions({ indent: next })}
+            />
+            <SegmentedControl
+              label="视图"
+              options={VIEW_OPTIONS}
+              value={view}
+              onChange={(next) => updateOptions({ view: next })}
+            />
+            <SegmentedControl
+              label="Unicode 转码"
+              options={UNICODE_OPTIONS}
+              value={unicode}
+              onChange={(next) => updateOptions({ unicode: next })}
+            />
+          </ToolbarRow>
+          <ToolbarRow>
+            <Checkbox
+              label="键排序"
+              checked={sortKeys}
+              onChange={(checked) => updateOptions({ sortKeys: checked })}
+            />
+            <Checkbox
+              label="保留转义"
+              checked={keepEscapes}
+              onChange={(checked) => updateOptions({ keepEscapes: checked })}
+            />
+            <button type="button" className={BUTTON} onClick={() => update({ input: SAMPLE })}>
+              填入示例
+            </button>
+            <button type="button" className={BUTTON} onClick={() => update({ input: '' })}>
+              清空
+            </button>
+          </ToolbarRow>
         </>
       }
       input={
@@ -185,6 +225,14 @@ export default function JsonFormatTool() {
               </span>
               {view !== 'hints' && (
                 <span className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    className={BUTTON}
+                    disabled={isEmpty}
+                    onClick={() => onNavigate?.('json-converter', { input })}
+                  >
+                    转换
+                  </button>
                   <CopyButton text={output ?? ''} label="复制" />
                   <DownloadButton
                     filename="formatted.json"
@@ -255,7 +303,10 @@ export default function JsonFormatTool() {
         ) : (
           <span>
             缩进 {INDENT_LABEL[indent]}
-            {sortKeys ? ' · 键排序' : ''} · {result.value.inputBytes} → {result.value.outputBytes} 字节
+            {sortKeys ? ' · 键排序' : ''}
+            {keepEscapes ? '' : ' · 规范化转义'}
+            {unicode === 'keep' ? '' : ` · Unicode ${UNICODE_LABEL[unicode]}`} ·{' '}
+            {result.value.inputBytes} → {result.value.outputBytes} 字节
           </span>
         )
       }

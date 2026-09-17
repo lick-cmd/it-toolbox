@@ -17,6 +17,11 @@ export default {
     '查找',
     '键排序',
     '类型提示',
+    '保留转义',
+    '转义',
+    'unicode',
+    'unicode转码',
+    '中文转unicode',
   ],
   order: 20,
 } satisfies ToolMeta

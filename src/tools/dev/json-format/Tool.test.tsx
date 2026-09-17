@@ -431,3 +431,54 @@ describe('JSON 美化 —— 搜索键与值', () => {
     expect(screen.queryByRole('textbox', { name: '搜索键和值' })).toBeNull()
   })
 })
+
+describe('转义与 Unicode 选项', () => {
+  it('默认勾选「保留转义」，输出与从前一致', () => {
+    render(<JsonFormatTool />)
+    setInput('{"a":"\\u0041"}')
+
+    // 仓库没装 @testing-library/jest-dom，没有 toBeChecked 这类匹配器
+    const keepEscapes = screen.getByRole('checkbox', { name: '保留转义' }) as HTMLInputElement
+    expect(keepEscapes.checked).toBe(true)
+    expect(lines().join('\n')).toContain('"\\u0041"')
+  })
+
+  it('取消勾选后规范化最小转义', async () => {
+    render(<JsonFormatTool />)
+    setInput('{"a":"\\u0041","b":"x\\/y"}')
+
+    await userEvent.click(screen.getByRole('checkbox', { name: '保留转义' }))
+
+    const out = lines().join('\n')
+    expect(out).toContain('"A"')
+    expect(out).toContain('"x/y"')
+  })
+
+  it('Unicode 转义把中文写成 \\uXXXX', async () => {
+    render(<JsonFormatTool />)
+    setInput('{"c":"中"}')
+
+    await userEvent.click(screen.getByRole('button', { name: '转义' }))
+
+    expect(lines().join('\n')).toContain('"\\u4e2d"')
+  })
+
+  it('Unicode 反转义把 \\uXXXX 还原', async () => {
+    render(<JsonFormatTool />)
+    setInput('{"c":"\\u4e2d"}')
+
+    await userEvent.click(screen.getByRole('button', { name: '反转义' }))
+
+    expect(lines().join('\n')).toContain('"中"')
+  })
+
+  it('「转换」按钮把同一份输入交给外壳', async () => {
+    const onNavigate = vi.fn()
+    render(<JsonFormatTool onNavigate={onNavigate} />)
+    setInput('{"a":1}')
+
+    await userEvent.click(screen.getByRole('button', { name: '转换' }))
+
+    expect(onNavigate).toHaveBeenCalledWith('json-converter', { input: '{"a":1}' })
+  })
+})
