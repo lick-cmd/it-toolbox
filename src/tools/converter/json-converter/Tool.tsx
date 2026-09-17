@@ -16,7 +16,7 @@ import { CopyButton } from '@/framework/ui/CopyButton'
 import { DownloadButton } from '@/framework/ui/DownloadButton'
 import { EmptyState } from '@/framework/ui/EmptyState'
 import { ErrorNote } from '@/framework/ui/ErrorNote'
-import { Checkbox, SegmentedControl, Select } from '@/framework/ui/Inputs'
+import { Checkbox, SegmentedControl, Select, ToolbarRow } from '@/framework/ui/Inputs'
 import { useToolState } from '@/framework/useToolState'
 
 // 若 lint 报 import 顺序，按仓库规则跑 `npx eslint --fix src/tools/converter/json-converter/Tool.tsx`
@@ -36,6 +36,15 @@ const INDENT_OPTIONS: readonly SelectOption<IndentChoice>[] = [
   { value: '2', label: '2 空格' },
   { value: '4', label: '4 空格' },
   { value: 'tab', label: '制表符' },
+]
+
+type UnicodeChoice = 'keep' | 'escape' | 'unescape'
+
+/** 文案与 json-format 姊妹实现保持一致（同一份 spec §5.3 / §8.2） */
+const UNICODE_OPTIONS: readonly SelectOption<UnicodeChoice>[] = [
+  { value: 'keep', label: '原样' },
+  { value: 'escape', label: '转义' },
+  { value: 'unescape', label: '反转义' },
 ]
 
 const FORMAT_META: Record<
@@ -77,12 +86,24 @@ const FORMAT_META: Record<
 /** 缩进选项对 CSV 无意义，且 YAML 规范禁止制表符缩进 */
 const NO_INDENT_FORMATS: ReadonlySet<FormatChoice> = new Set<FormatChoice>(['csv'])
 
+/**
+ * ① 「保留转义」/ ② 「Unicode 转码」只对 JS / PHP 生效。
+ *
+ * CSV（spec §8.2「CSV 时禁用」）、YAML、XML 下不渲染这两个控件：YAML 的 `jsonToYaml`
+ * 签名没有这两个选项且由 js-yaml 重建输出、XML 的文本节点语义 spec 未规定 —— 渲染一个
+ * 点了没反应的控件骗人，故与上方「缩进对 CSV」的既有做法一致，用不渲染表达不可交互。
+ * （框架层 `Checkbox` / `SegmentedControl` 没有 `disabled` 属性，本轮不改 framework/。）
+ */
+const ESCAPE_AWARE_FORMATS: ReadonlySet<FormatChoice> = new Set<FormatChoice>(['js', 'php'])
+
 const INITIAL_STATE = {
   input: '',
   options: {
     format: 'js' as FormatChoice,
     indent: '2' as IndentChoice,
     wrapArrayItems: false,
+    keepEscapes: true,
+    unicode: 'keep' as UnicodeChoice,
   },
 }
 
@@ -98,7 +119,7 @@ function toJsonIndent(choice: IndentChoice): JsonIndent {
 export default function JsonConverterTool({ handoff, onNavigate }: ToolProps) {
   const { state, update, updateOptions } = useToolState('json-converter', INITIAL_STATE, handoff)
   const { input } = state
-  const { format, indent, wrapArrayItems } = state.options
+  const { format, indent, wrapArrayItems, keepEscapes, unicode } = state.options
 
   const inputBytes = utf8ByteLength(input)
   const isEmpty = input.trim().length === 0
@@ -108,9 +129,9 @@ export default function JsonConverterTool({ handoff, onNavigate }: ToolProps) {
     const indentValue = toJsonIndent(indent)
     switch (format) {
       case 'js':
-        return jsonToJs(input, { indent: indentValue })
+        return jsonToJs(input, { indent: indentValue, keepEscapes, unicode })
       case 'php':
-        return jsonToPhp(input, { indent: indentValue })
+        return jsonToPhp(input, { indent: indentValue, keepEscapes, unicode })
       // YAML 规范禁止制表符缩进，选 tab 时降级为 2 空格
       case 'yaml':
         return jsonToYaml(input, { indent: indent === '4' ? 4 : 2 })
@@ -118,11 +139,16 @@ export default function JsonConverterTool({ handoff, onNavigate }: ToolProps) {
         return jsonToCsv(input)
       case 'xml':
         return jsonToXml(input, { indent: indentValue, wrapArrayItems })
+      default:
+        // 持久化 / handoff 的 options 不校验 schema（useToolState 原样合入）：
+        // 运行时的非法 format 落到与索引兜底同一套的默认格式，不把 undefined 抛进错误边界。
+        return jsonToJs(input, { indent: indentValue, keepEscapes, unicode })
     }
-  }, [isEmpty, input, format, indent, wrapArrayItems])
+  }, [isEmpty, input, format, indent, wrapArrayItems, keepEscapes, unicode])
 
   const output = converted !== null && converted.ok ? converted.value : null
-  const meta = FORMAT_META[format]
+  // 非法 format 时索引出 undefined，同样兜底到 JS，避免渲染路径抛错
+  const meta = FORMAT_META[format] ?? FORMAT_META.js
 
   // YAML 经 js-yaml 重建，超大整数会丢精度 —— 如实提示，而不是假装没事
   const yamlPrecisionLoss = useMemo(
@@ -136,43 +162,63 @@ export default function JsonConverterTool({ handoff, onNavigate }: ToolProps) {
   return (
     <ToolLayout
       options={
-        <>
-          <Select
-            label="目标格式"
-            options={FORMAT_OPTIONS}
-            value={format}
-            onChange={(next) => updateOptions({ format: next })}
-          />
-          {!NO_INDENT_FORMATS.has(format) && (
-            <SegmentedControl
-              label="缩进"
-              options={INDENT_OPTIONS}
-              value={indent}
-              onChange={(next) => updateOptions({ indent: next })}
+        // 控件变多，照 json-format/Tool.tsx（R32）定下的形状：列容器 + 两个 ToolbarRow
+        <div className="flex w-full flex-col gap-y-2">
+          <ToolbarRow>
+            <Select
+              label="目标格式"
+              options={FORMAT_OPTIONS}
+              value={format}
+              onChange={(next) => updateOptions({ format: next })}
             />
-          )}
-          {format === 'xml' && (
-            <Checkbox
-              label="数组用 item 包裹"
-              checked={wrapArrayItems}
-              onChange={(checked) => updateOptions({ wrapArrayItems: checked })}
-            />
-          )}
-          <button type="button" className={BUTTON} onClick={() => update({ input: SAMPLE })}>
-            填入示例
-          </button>
-          <button type="button" className={BUTTON} onClick={() => update({ input: '' })}>
-            清空
-          </button>
-          <button
-            type="button"
-            className={BUTTON}
-            disabled={isEmpty}
-            onClick={() => onNavigate?.('json-format', { input })}
-          >
-            去美化
-          </button>
-        </>
+            {!NO_INDENT_FORMATS.has(format) && (
+              <SegmentedControl
+                label="缩进"
+                options={INDENT_OPTIONS}
+                value={indent}
+                onChange={(next) => updateOptions({ indent: next })}
+              />
+            )}
+            {format === 'xml' && (
+              <Checkbox
+                label="数组用 item 包裹"
+                checked={wrapArrayItems}
+                onChange={(checked) => updateOptions({ wrapArrayItems: checked })}
+              />
+            )}
+            {ESCAPE_AWARE_FORMATS.has(format) && (
+              <>
+                <Checkbox
+                  label="保留转义"
+                  checked={keepEscapes}
+                  onChange={(checked) => updateOptions({ keepEscapes: checked })}
+                />
+                <SegmentedControl
+                  label="Unicode 转码"
+                  options={UNICODE_OPTIONS}
+                  value={unicode}
+                  onChange={(next) => updateOptions({ unicode: next })}
+                />
+              </>
+            )}
+          </ToolbarRow>
+          <ToolbarRow>
+            <button type="button" className={BUTTON} onClick={() => update({ input: SAMPLE })}>
+              填入示例
+            </button>
+            <button type="button" className={BUTTON} onClick={() => update({ input: '' })}>
+              清空
+            </button>
+            <button
+              type="button"
+              className={BUTTON}
+              disabled={isEmpty}
+              onClick={() => onNavigate?.('json-format', { input })}
+            >
+              去美化
+            </button>
+          </ToolbarRow>
+        </div>
       }
       input={
         <CodeArea

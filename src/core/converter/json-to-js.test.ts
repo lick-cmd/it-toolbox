@@ -79,3 +79,36 @@ describe('jsonToJs', () => {
     }
   })
 })
+
+describe('jsonToJs —— 转义与 Unicode 开关', () => {
+  type Rewrite = { keepEscapes?: boolean; unicode?: 'keep' | 'escape' | 'unescape' }
+
+  const jsWith = (text: string, options: Rewrite) => {
+    const result = jsonToJs(text, options)
+    if (!result.ok) throw new Error(`期望成功，实际失败：${result.error}`)
+    return result.value
+  }
+
+  it('默认值（保留转义 / keep）与复用原文逐字节相同', () => {
+    const source = '{"u":"\\u0041","s":"a\\/b"}'
+    expect(jsWith(source, {})).toBe(jsOf(source))
+    expect(jsWith(source, { keepEscapes: true, unicode: 'keep' })).toBe(jsOf(source))
+    expect(jsWith('{"中文":"值"}', {})).toBe('const data = {\n  "中文": "值"\n};')
+  })
+
+  it('keepEscapes=false 规范化最小转义（键与值一视同仁）', () => {
+    const out = jsWith('{"\\u0041":"x\\/y"}', { keepEscapes: false })
+    expect(out).toContain('"A": "x/y"')
+  })
+
+  it("unicode='escape' 非 ASCII 写成分离的 \\uXXXX（BMP 外拆成代理对）", () => {
+    const out = jsWith('{"c":"中","e":"😀"}', { unicode: 'escape' })
+    expect(out).toContain('"c": "\\u4e2d"')
+    expect(out).toContain('"e": "\\ud83d\\ude00"')
+  })
+
+  it("unicode='unescape' 把 \\uXXXX 还原为真实字符", () => {
+    const out = jsWith('{"c":"\\u4e2d"}', { unicode: 'unescape' })
+    expect(out).toContain('"c": "中"')
+  })
+})

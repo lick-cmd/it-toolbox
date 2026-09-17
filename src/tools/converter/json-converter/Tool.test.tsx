@@ -23,6 +23,13 @@ vi.mock('@/framework/file', async (importOriginal) => {
   return { ...actual, downloadText: fileMocks.downloadText }
 })
 
+// 复制入参必须可观测（spec §9「BOM 只出现在下载入参里」）：mock 写法照
+// `src/tools/crypto/rsa-key-generator/Tool.test.tsx:58-61` 的既有先例。
+const clipboardMocks = vi.hoisted(() => ({
+  copyText: vi.fn(async (_text: string) => ({ ok: true as const, value: undefined })),
+}))
+vi.mock('@/framework/clipboard', () => clipboardMocks)
+
 const lines = () =>
   screen.getAllByRole('listitem').map((item) => item.lastElementChild?.textContent ?? '')
 
@@ -38,6 +45,7 @@ const pickFormat = async (value: 'js' | 'php' | 'yaml' | 'csv' | 'xml') => {
 beforeEach(() => {
   localStorage.clear()
   fileMocks.downloadText.mockClear()
+  clipboardMocks.copyText.mockClear()
 })
 
 describe('JSON 转换器', () => {
@@ -118,8 +126,14 @@ describe('JSON 转换器', () => {
     const text = fileMocks.downloadText.mock.calls[0]?.[1]
     expect(text).toBe('\ufeffa\n1')
 
-    // 复制按钮走的是同一份纯净输出（不含 BOM）
-    expect(screen.getByRole('button', { name: '复制' })).toBeDefined()
+    // 复制按钮走的是同一份纯净输出（不含 BOM）—— 必须真的钉住复制入参，
+    // 否则将来有人把 CopyButton 的 text 接到 downloadText（反之亦然）无人发现
+    await userEvent.click(screen.getByRole('button', { name: '复制' }))
+    await vi.waitFor(() => expect(clipboardMocks.copyText).toHaveBeenCalled())
+
+    const copied = clipboardMocks.copyText.mock.calls[0]?.[0]
+    expect(copied).toBe('a\n1')
+    expect(copied).not.toContain('\ufeff')
   })
 
   it('YAML 且含超大整数时挂提示条', async () => {
@@ -149,6 +163,76 @@ describe('JSON 转换器', () => {
 
     render(<JsonConverterTool handoff={{ input: '{"a":1}' }} />)
 
+    expect(lines().join('\n')).toContain('const data = {')
+  })
+})
+
+describe('JSON 转换器 —— 转义与 Unicode 开关（仅 JS / PHP 可交互）', () => {
+  it('JS 下默认勾选「保留转义」，两个控件都在，输出与从前一致', () => {
+    render(<JsonConverterTool />)
+    setInput('{"a":"\\u0041"}')
+
+    // 仓库没装 @testing-library/jest-dom，没有 toBeChecked 这类匹配器
+    const keepEscapes = screen.getByRole('checkbox', { name: '保留转义' }) as HTMLInputElement
+    expect(keepEscapes.checked).toBe(true)
+    expect(screen.getByRole('group', { name: 'Unicode 转码' })).toBeDefined()
+    expect(lines().join('\n')).toContain('"a": "\\u0041"')
+  })
+
+  it('JS 下取消勾选后规范化最小转义', async () => {
+    render(<JsonConverterTool />)
+    setInput('{"a":"\\u0041","b":"x\\/y"}')
+
+    await userEvent.click(screen.getByRole('checkbox', { name: '保留转义' }))
+
+    const out = lines().join('\n')
+    expect(out).toContain('"a": "A"')
+    expect(out).toContain('"b": "x/y"')
+  })
+
+  it('JS 下 Unicode 转义把中文写成 \\uXXXX', async () => {
+    render(<JsonConverterTool />)
+    setInput('{"c":"中"}')
+
+    await userEvent.click(screen.getByRole('button', { name: '转义' }))
+
+    expect(lines().join('\n')).toContain('"c": "\\u4e2d"')
+  })
+
+  it('PHP 下 Unicode 转义写成 \\u{码点}', async () => {
+    render(<JsonConverterTool />)
+    setInput('{"c":"中"}')
+    await pickFormat('php')
+
+    await userEvent.click(screen.getByRole('button', { name: '转义' }))
+
+    expect(lines().join('\n')).toContain('"c" => "\\u{4e2d}"')
+  })
+
+  it('CSV / YAML / XML 下两个开关不可交互', async () => {
+    render(<JsonConverterTool />)
+    setInput('[{"a":1}]')
+
+    for (const value of ['csv', 'yaml', 'xml'] as const) {
+      await pickFormat(value)
+      expect(screen.queryByRole('checkbox', { name: '保留转义' })).toBeNull()
+      expect(screen.queryByRole('group', { name: 'Unicode 转码' })).toBeNull()
+    }
+  })
+})
+
+describe('JSON 转换器 —— 非法 format 兜底', () => {
+  it('持久化状态里的非法 format 落到默认格式，而不是抛进错误边界', () => {
+    localStorage.setItem(
+      'itt:v1:toolState',
+      JSON.stringify({
+        'json-converter': { input: '{"a":1}', options: { format: 'bogus' }, updatedAt: 1 },
+      }),
+    )
+
+    render(<JsonConverterTool />)
+
+    expect(screen.queryByRole('alert')).toBeNull()
     expect(lines().join('\n')).toContain('const data = {')
   })
 })

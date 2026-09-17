@@ -14,6 +14,8 @@ export default {
     'js',
     'php',
     'yaml',
+    'yml',
+    'stringify',
     'csv',
     'xml',
     'json转yaml',
@@ -22,6 +24,8 @@ export default {
     'json转js',
     'json转php',
     '表格',
+    // 并入被下线的 json-to-yaml 的关键词（spec §8.3）
+    '配置',
   ],
   order: 30,
 } satisfies ToolMeta

@@ -1,10 +1,15 @@
 import { ok, type Result } from '../result'
 import { indentUnit, type JsonIndent } from '../json/format'
 import { buildJsonNodes, type JsonNode } from '../json/nodes'
+import { rewriteStringToken, type RewriteOptions, type UnicodeMode } from '../json/escape'
 
 export interface JsonToJsOptions {
   /** 默认 2 */
   indent?: JsonIndent
+  /** 默认 true：原样保留输入里的转义写法；false 时规范化为最小转义 */
+  keepEscapes?: boolean
+  /** 默认 'keep' */
+  unicode?: UnicodeMode
 }
 
 /**
@@ -15,8 +20,10 @@ export interface JsonToJsOptions {
  * 字符串直接复用 JSON 原文 —— JSON 的字符串字面量是 JS 字符串字面量的子集，
  * 且 `\/`、`\uXXXX` 在两边语义一致。
  *
- * 刻意不提供 `keepEscapes` / `unicode`：转换器界面不暴露这两个开关
- * （它们属于 json-format），在此只会成为无法触达的死参数。
+ * `keepEscapes` / `unicode` 按 spec §5.3 / §8.2 生效，键与值一视同仁（`formatJson`
+ * 对键值同等对待，转换器不能两样）。默认值（`true` / `'keep'`）下
+ * `rewriteStringToken` 在 `!normalizeEscapes && unicode === 'keep'` 时原样返回，
+ * 逐字节等于复用原文，不开这两个开关时零额外开销。
  */
 export function jsonToJs(text: string, options: JsonToJsOptions = {}): Result<string> {
   if (text.trim().length === 0) return ok('')
@@ -25,7 +32,11 @@ export function jsonToJs(text: string, options: JsonToJsOptions = {}): Result<st
   if (!built.ok) return built
 
   const unit = indentUnit(options.indent ?? 2)
-  return ok(`const data = ${emit(built.value, unit, '')};`)
+  const rewrite: RewriteOptions = {
+    normalizeEscapes: options.keepEscapes === false,
+    unicode: options.unicode ?? 'keep',
+  }
+  return ok(`const data = ${emit(built.value, unit, '', rewrite)};`)
 }
 
 /**
@@ -39,12 +50,15 @@ export function jsonToJs(text: string, options: JsonToJsOptions = {}): Result<st
  * CSV 是扁平结构。待真的出现第三个「同形」骨架时，再按 rule of three 一并抽取
  * （见 Task 7 的审查范围）。
  */
-function emit(node: JsonNode, unit: string, indent: string): string {
+function emit(node: JsonNode, unit: string, indent: string, rewrite: RewriteOptions): string {
   if (node.kind === 'object') {
     if (node.entries.length === 0) return '{}'
     const inner = indent + unit
     const body = node.entries
-      .map((entry) => `${inner}${entry.rawKey}: ${emit(entry.value, unit, inner)}`)
+      .map(
+        (entry) =>
+          `${inner}${rewriteStringToken(entry.rawKey, rewrite)}: ${emit(entry.value, unit, inner, rewrite)}`,
+      )
       .join(',\n')
     return `{\n${body}\n${indent}}`
   }
@@ -52,9 +66,13 @@ function emit(node: JsonNode, unit: string, indent: string): string {
   if (node.kind === 'array') {
     if (node.items.length === 0) return '[]'
     const inner = indent + unit
-    const body = node.items.map((item) => `${inner}${emit(item, unit, inner)}`).join(',\n')
+    const body = node.items
+      .map((item) => `${inner}${emit(item, unit, inner, rewrite)}`)
+      .join(',\n')
     return `[\n${body}\n${indent}]`
   }
 
+  // `raw` 与 `rewriteStringToken` 同口径（含引号的完整 token），键与值走同一条改写路径
+  if (node.kind === 'string') return rewriteStringToken(node.raw, rewrite)
   return node.raw
 }

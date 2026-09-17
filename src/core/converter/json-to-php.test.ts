@@ -94,3 +94,47 @@ describe('jsonToPhp', () => {
     expect(result.ok).toBe(false)
   })
 })
+
+describe('jsonToPhp —— Unicode 转义开关', () => {
+  type Rewrite = { keepEscapes?: boolean; unicode?: 'keep' | 'escape' | 'unescape' }
+
+  const phpWith = (text: string, options: Rewrite) => {
+    const result = jsonToPhp(text, options)
+    if (!result.ok) throw new Error(`期望成功，实际失败：${result.error}`)
+    return result.value
+  }
+
+  it("'keep' 与 'unescape' 等价：值已解码，中文保持真实字符", () => {
+    expect(phpWith('{"s":"中"}', {})).toContain('"s" => "中"')
+    expect(phpWith('{"s":"中"}', { unicode: 'keep' })).toBe(phpWith('{"s":"中"}', {}))
+    expect(phpWith('{"s":"\\u4e2d"}', { unicode: 'unescape' })).toBe(phpWith('{"s":"\\u4e2d"}', {}))
+  })
+
+  it("unicode='escape' 非 ASCII 写成 \\u{码点}（键与值一视同仁）", () => {
+    expect(phpWith('{"c":"中"}', { unicode: 'escape' })).toContain('"c" => "\\u{4e2d}"')
+    expect(phpWith('{"中":1}', { unicode: 'escape' })).toContain('"\\u{4e2d}" => 1')
+  })
+
+  it('BMP 外用码点而非 UTF-16 代理对', () => {
+    expect(phpWith('{"e":"😀"}', { unicode: 'escape' })).toContain('"e" => "\\u{1f600}"')
+  })
+
+  it('escape 不改变既有转义分支的写法与优先级', () => {
+    expect(phpWith('{"s":"a\\"b"}', { unicode: 'escape' })).toContain('"a\\"b"')
+    expect(phpWith('{"s":"a\\\\b"}', { unicode: 'escape' })).toContain('"a\\\\b"')
+    expect(phpWith('{"s":"$x"}', { unicode: 'escape' })).toContain('"\\$x"')
+    expect(phpWith('{"s":"a\\nb"}', { unicode: 'escape' })).toContain('"a\\nb"')
+    expect(phpWith('{"s":"\\u0001"}', { unicode: 'escape' })).toContain('"\\x01"')
+  })
+
+  it('孤立代理码元在 escape 下按原样输出（PHP \\u{} 只接受码点）', () => {
+    const raw = '{"s":"\\ud800"}'
+    expect(phpWith(raw, { unicode: 'escape' })).toBe(phpWith(raw, {}))
+  })
+
+  it('keepEscapes 对 PHP 是 moot：两种取值输出相同', () => {
+    expect(phpWith('{"s":"a\\/b"}', { keepEscapes: false })).toBe(
+      phpWith('{"s":"a\\/b"}', { keepEscapes: true }),
+    )
+  })
+})
