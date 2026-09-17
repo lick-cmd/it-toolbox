@@ -149,7 +149,7 @@ export default function JsonFormatTool({ handoff, onNavigate }: ToolProps) {
   return (
     <ToolLayout
       options={
-        <>
+        <div className="flex w-full flex-col gap-y-2">
           <ToolbarRow>
             <SegmentedControl
               label="缩进"
@@ -188,7 +188,7 @@ export default function JsonFormatTool({ handoff, onNavigate }: ToolProps) {
               清空
             </button>
           </ToolbarRow>
-        </>
+        </div>
       }
       input={
         <CodeArea
