@@ -51,6 +51,11 @@ export function yamlToJson(text: string, options: YamlToJsonOptions = {}): Resul
   }
 }
 
+export interface JsonToYamlOptions {
+  /** 默认 2。YAML 规范禁止用制表符缩进，故这里只有 2 | 4 */
+  indent?: YamlIndent
+}
+
 /**
  * JSON → YAML。
  *
@@ -64,11 +69,6 @@ export function yamlToJson(text: string, options: YamlToJsonOptions = {}): Resul
  * 已知有损点：本函数经 `js-yaml` 重新序列化，会丢大整数精度与重复键。
  * 调用方应用 `hasUnsafeInteger` 提示用户，而不是假装没事。
  */
-export interface JsonToYamlOptions {
-  /** 默认 2。YAML 规范禁止用制表符缩进，故这里只有 2 | 4 */
-  indent?: YamlIndent
-}
-
 export function jsonToYaml(text: string, options: JsonToYamlOptions = {}): Result<string> {
   if (text.trim().length === 0) return ok('')
 
