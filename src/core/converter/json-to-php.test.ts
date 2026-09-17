@@ -62,7 +62,7 @@ describe('jsonToPhp', () => {
     expect(phpOf('{"s":"\\u000b"}')).toContain('"\\x0b"')
   })
 
-  it('中文保持真实字符（② 转义不在转换器里暴露）', () => {
+  it('中文保持真实字符（默认 keep）', () => {
     expect(phpOf('{"s":"中"}')).toContain('"s" => "中"')
     expect(phpOf('{"s":"\\u4e2d"}')).toContain('"s" => "中"')
   })

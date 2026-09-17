@@ -46,7 +46,7 @@ export function jsonToPhp(text: string, options: JsonToPhpOptions = {}): Result<
 }
 
 /**
- * ⚠️ 本骨架与 `json-to-js.ts:42-60` 的 `emit` **同构**：对象 / 数组分支的缩进推进与
+ * ⚠️ 本骨架与 `json-to-js.ts` 的 `emit` **同构**：对象 / 数组分支的缩进推进与
  * `,\n` 连接逻辑逐字一致，函数签名也相同，仅三处不同 —— 空容器字面量（`[]` vs `{}`）、
  * 键写法（`"k" =>` vs `rawKey:`）、值写法（字符串重新编码 vs 复用 JSON 原文）。
  * 结构或分隔符语义变更时**两处必须同步修改** —— 漏改任一都会造成两路输出风格分叉。
