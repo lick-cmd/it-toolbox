@@ -255,6 +255,12 @@ describe('App', () => {
 
     await userEvent.click(screen.getByRole('button', { name: '去美化' }))
 
+    // h1 是「导航真的发生了」的见证：只断言 value 的话，没接线的实现
+    // （点按钮是 no-op、仍停在转换器页）也会通过 —— 那条断言在 RED 阶段就空转过。
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('JSON 美化')
+    })
+
     await waitFor(() => {
       const back = screen.getByRole('textbox', { name: 'JSON 源码' }) as HTMLTextAreaElement
       expect(back.value).toBe('{"b":2}')
