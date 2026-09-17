@@ -46,3 +46,22 @@ export interface ToolMeta {
 export function isToolCategory(value: unknown): value is ToolCategory {
   return typeof value === 'string' && (TOOL_CATEGORIES as readonly string[]).includes(value)
 }
+
+/** 从一个工具跳到另一个工具时携带的一次性载荷 */
+export interface ToolHandoff {
+  input: string
+  options?: Record<string, unknown>
+}
+
+/**
+ * 工具组件收到的属性。
+ *
+ * 两个字段都是可选的，因此现有工具（不声明任何参数）无需改动 —— React 允许
+ * 组件少声明参数，`ComponentType<{}>` 也可赋值给 `ComponentType<ToolProps>`。
+ */
+export interface ToolProps {
+  /** 本次跳转带过来的载荷。仅在「被跳转」的那次挂载上有值 */
+  handoff?: ToolHandoff
+  /** 跳到另一个工具。由应用外壳注入，工具自身不感知路由 */
+  onNavigate?: (toolId: string, payload?: ToolHandoff) => void
+}

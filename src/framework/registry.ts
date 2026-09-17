@@ -1,8 +1,8 @@
 import type { ComponentType } from 'react'
 import { categoryOrder } from './categories'
-import { isToolCategory, type ToolCategory, type ToolMeta } from './types'
+import { isToolCategory, type ToolCategory, type ToolMeta, type ToolProps } from './types'
 
-export type ToolComponent = ComponentType
+export type ToolComponent = ComponentType<ToolProps>
 
 export interface ToolEntry {
   meta: ToolMeta

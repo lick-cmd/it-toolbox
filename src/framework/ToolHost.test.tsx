@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ToolEntry } from './registry'
 import { ToolErrorBoundary } from './ToolErrorBoundary'
 import { ToolHost } from './ToolHost'
+import type { ToolHandoff, ToolProps } from './types'
 
 /** 以 loader 构造 entry。id / name 可变，用于验证「切换工具时错误态重置」这一契约。 */
 function entryWithLoader(
@@ -73,6 +74,27 @@ describe('ToolHost', () => {
     )
     expect(await screen.findByText('已恢复')).toBeDefined()
     spy.mockRestore()
+  })
+
+  it('把 handoff 与 onNavigate 透传给工具组件', async () => {
+    const seen: Array<{ handoff: ToolHandoff | undefined }> = []
+    const onNavigate = vi.fn()
+
+    const Probe = ({ handoff }: ToolProps) => {
+      seen.push({ handoff })
+      return <p>探针</p>
+    }
+
+    render(
+      <ToolHost
+        entry={entryWith(Probe)}
+        handoff={{ input: '{"a":1}' }}
+        onNavigate={onNavigate}
+      />,
+    )
+
+    expect(await screen.findByText('探针')).toBeDefined()
+    expect(seen[0]?.handoff).toEqual({ input: '{"a":1}' })
   })
 })
 

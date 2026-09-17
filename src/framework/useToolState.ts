@@ -8,16 +8,37 @@ export interface ToolStateShape {
   options: Record<string, unknown>
 }
 
+/** 跨工具交接的载荷：有值时优先于本地持久化 */
+export interface ToolStateSeed {
+  input?: string
+  options?: Record<string, unknown>
+}
+
 /**
  * 按工具 id 隔离的状态。
  *
  * 写入去抖 200ms，避免每次按键都触碰 localStorage。
  * 挂载时若存在历史状态则恢复，满足 spec 的「重新打开仍保留上次输入」。
+ *
+ * `seed` 是跨工具跳转的落点：**它的优先级高于持久化** —— 跳转带来的这份输入
+ * 才是用户当下的意图，若让旧内容盖掉它，功能看起来就完全失效了。
  */
-export function useToolState<S extends ToolStateShape>(toolId: string, initial: S) {
+export function useToolState<S extends ToolStateShape>(
+  toolId: string,
+  initial: S,
+  seed?: ToolStateSeed,
+) {
   const [state, setState] = useState<S>(() => {
+    const base = {
+      ...initial,
+      input: seed?.input ?? initial.input,
+      options: { ...initial.options, ...seed?.options },
+    } as S
+
+    if (seed) return base
+
     const saved = loadToolStateEntry(toolId)
-    if (!saved) return initial
+    if (!saved) return base
     return {
       ...initial,
       input: saved.input,

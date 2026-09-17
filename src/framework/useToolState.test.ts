@@ -76,4 +76,43 @@ describe('useToolState', () => {
     expect(result.current.state.options.size).toBe(8)
     expect(localStorage.getItem(TOOL_STATE_KEY) ?? '').not.toContain('"a"')
   })
+
+  it('seed 优先于本地持久化（跳转带来的输入必须赢，旧持久内容整体不参与）', () => {
+    seed({ a: { input: '旧的持久化内容', options: { size: 32 }, updatedAt: 1 } })
+
+    const { result } = renderHook(() =>
+      useToolState('a', INITIAL, { input: '跳转带来的 JSON' }),
+    )
+
+    expect(result.current.state.input).toBe('跳转带来的 JSON')
+    // seed 存在时不读持久化：持久化的 size 是 32，这里必须是初始值 8
+    expect(result.current.state.options.size).toBe(8)
+  })
+
+  it('seed 的 options 参与合并（不会被忽略）', () => {
+    seed({ a: { input: 'x', options: { size: 32 }, updatedAt: 1 } })
+
+    const { result } = renderHook(() => useToolState('a', INITIAL, { options: { size: 64 } }))
+
+    expect(result.current.state.options.size).toBe(64)
+  })
+
+  it('seed 会把交接来的内容写回持久化', async () => {
+    const { result } = renderHook(() => useToolState('a', INITIAL, { input: '交接内容' }))
+
+    // 去抖 200ms
+    await new Promise((resolve) => setTimeout(resolve, 300))
+
+    expect(localStorage.getItem(TOOL_STATE_KEY) ?? '').toContain('交接内容')
+    expect(result.current.state.input).toBe('交接内容')
+  })
+
+  it('不传 seed 时行为与从前一致', () => {
+    seed({ a: { input: '上次的输入', options: { size: 32 }, updatedAt: 1 } })
+
+    const { result } = renderHook(() => useToolState('a', INITIAL))
+
+    expect(result.current.state.input).toBe('上次的输入')
+    expect(result.current.state.options.size).toBe(32)
+  })
 })

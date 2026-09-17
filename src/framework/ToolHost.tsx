@@ -1,13 +1,17 @@
 import { Suspense, lazy, useMemo } from 'react'
 import type { ToolEntry } from './registry'
+import type { ToolHandoff } from './types'
 import { ToolErrorBoundary } from './ToolErrorBoundary'
 import { Spinner } from './ui/Spinner'
 
 export interface ToolHostProps {
   entry: ToolEntry
+  /** 本次跳转带来的载荷；调用方需自行确保它属于 `entry` */
+  handoff?: ToolHandoff
+  onNavigate?: (toolId: string, payload?: ToolHandoff) => void
 }
 
-export function ToolHost({ entry }: ToolHostProps) {
+export function ToolHost({ entry, handoff, onNavigate }: ToolHostProps) {
   // entry.load 是 glob 产生的懒加载 thunk，lazy() 据此为每个工具生成独立 chunk
   const Tool = useMemo(() => lazy(entry.load), [entry])
 
@@ -20,7 +24,7 @@ export function ToolHost({ entry }: ToolHostProps) {
           </div>
         }
       >
-        <Tool />
+        <Tool handoff={handoff} onNavigate={onNavigate} />
       </Suspense>
     </ToolErrorBoundary>
   )
